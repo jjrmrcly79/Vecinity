@@ -190,6 +190,19 @@ export default function Dashboard() {
         {isAdmin && (
           <section className="mt-7">
             <button
+              onClick={() => router.push("/dashboard/comite")}
+              className="mb-3 w-full rounded-2xl bg-gradient-to-br from-brand-500 to-emerald-600 p-3.5 flex items-center gap-3 text-left shadow hover:opacity-95 transition"
+            >
+              <span className="text-2xl">📊</span>
+              <span className="block font-semibold text-white text-sm">
+                Panel del comité
+                <span className="block text-xs text-white/80 font-normal">
+                  Pendientes, finanzas y mayores adeudos
+                </span>
+              </span>
+              <span className="ml-auto text-white/80 text-lg">›</span>
+            </button>
+            <button
               onClick={() => router.push("/vigilancia")}
               className="mb-3 w-full rounded-2xl bg-slate-800 ring-1 ring-slate-700 p-3.5 flex items-center gap-3 text-left hover:bg-slate-700 transition"
             >

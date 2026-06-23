@@ -26,7 +26,7 @@ servicios al **estatus de pago**. → La paridad es requisito de lanzamiento, no
 | Residente | Reportar incidencia (con foto) | ✅ — reporte (infractor por casa **o placa**) + evidencia a Storage + resolución comité con monto por reincidencia (2026-06-23) |
 | Residente | Paquetes, propuestas/votos, marketplace, comunidad | ❌ |
 | Vigilante | **Vista completa** (entrada/salida visitas, placas, paquetes, turnos, ciclo de llave de reservas, **servicios generales + recurrentes con foto**) | ✅ — `/vigilancia` (2026-06-23). Falta: fotos INE/placas de visitas, OCR placas, gafetes, registro manual de visita, historial/analytics |
-| Comité/Admin | Aprobar pagos/vehículos, resolver multas, generar cobros, gastos, finanzas | ⚠️ ✅ aprobar vecinos · ✅ vehículos · ✅ abonos · ✅ áreas/reservas · ✅ **resolver incidencias/multas**. Falta: generar cobros mensuales, gastos, dashboard finanzas |
+| Comité/Admin | Aprobar pagos/vehículos, resolver multas, generar cobros, gastos, finanzas | ⚠️ ✅ aprobar vecinos · ✅ vehículos · ✅ abonos · ✅ áreas/reservas · ✅ resolver incidencias · ✅ **Panel del comité** (pendientes+finanzas+morosos) · ✅ anti-duplicado de comprobante por hash. ✅ **generar cobros mensuales** + recargos · ✅ **convenios de pago (seguimiento semanal)**. Falta: conciliación bancaria CSV, gastos/dashboard de gastos, censo, export |
 
 ## 📋 Áreas comunes — reglas del reglamento (VALIDAR antes de construir)
 Fuente: `Reglamento_Consolidado_Villa_Catania_2026.docx` (Anexos A y B).

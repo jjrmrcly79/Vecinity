@@ -105,6 +105,26 @@ Migración `007_notifications.sql`. Token SOLO en `vecino.tg_send()` (SECURITY D
   vía wrapper `vecino.cron_late_fees(token)` (gate, anon key, sin service role). 53 pagos vencidos pendientes de correr.
 - Todo se registra en `vecino.notifications` (log/auditoría). pg_cron NO existe → schedule por n8n.
 
+## Panel del comité — ✅ centro de mando (2026-06-23)
+Mejora del `dashboard_admin` legacy. `/dashboard/comite` (rol admin/comité):
+- **Pendientes** en un solo lugar (conteo + link): abonos, vehículos, incidencias, vecinos.
+- **Finanzas de la colonia**: adeudo total (Σ saldo>0), saldo a favor, # morosos, # al corriente
+  (calculado en cliente desde `houses`; RLS admin por colonia).
+- **Mayores adeudos** (top 8 casas con saldo>0).
+- Acceso desde un botón destacado en el dashboard (sección comité).
+- **Validación automatizada** que el legacy hacía a mano: comprobante duplicado por imagen
+  (hash SHA-256, ver Pagos/migración `017`).
+- **Cobros mensuales + recargos (migración `018`)**: `generar_cobros_mensuales(periodo)` (CARGO de
+  `colonias.cuota_mensual`=**$750** por casa, idempotente por periodo) y `aplicar_recargos(periodo)`
+  (CARGO `colonias.recargo`=**$100** a quien sigue debiendo tras el día 10). Botones en el panel.
+  Pensados para el día 1 (cobros) / día 11 (recargos) — automatizables con n8n scheduleTrigger (pendiente confirmar).
+- **Convenios de pago (migración `019`)**: tabla `payment_plans` (monto semanal + deuda acordada);
+  `crear_convenio`/`cerrar_convenio` (marca casa `en_convenio`) + `convenios_seguimiento()` →
+  **esperado (semanas×monto) vs abonado** (abonos desde que inició) → al día / atrasado, con barra de
+  progreso en el panel. Resuelve el seguimiento manual de morosos que pagan semanal.
+- `npm run build` limpio. **Pendiente (finanzas avanzadas):** conciliación bancaria (CSV diario →
+  match depósito↔casa), gastos (`expenses`) + gráfica por categoría, cobranza-por-casa, export Excel/CSV.
+
 ## Incidencias / multas — ✅ reporte + resolución comité (2026-06-23)
 Sexta función de paridad (`incident_reports`: **131 pendientes reales** + 7 `fine_categories`).
 - **Migración `014_incidencias.sql`** (aplicada) + **`014b`** (bucket `vecino-evidencias`):
@@ -153,8 +173,10 @@ Cuarta función de paridad (libro mayor `transactions`: cargo/abono/ajuste, 2427
 - **Bucket Storage `vecino-comprobantes`** (público, paths `colonia/casa/uuid.ext`) + políticas
   `insert/select` para `authenticated` (creado vía `/pg/query` sobre `storage.objects`).
 - **Migración `012_pagos.sql`** (aplicada): RPCs SECURITY DEFINER:
-  - `registrar_abono(monto, comprobante_url, concepto)` → transacción `abono` `pendiente`;
-    anti-duplicado (mismo monto en 10 min); valida monto>0.
+  - `registrar_abono(monto, comprobante_url, concepto, comprobante_hash)` → transacción `abono`
+    `pendiente`; **doble anti-duplicado**: (1) mismo monto en 10 min, (2) **mismo comprobante por
+    hash SHA-256** (migración `017`, el cliente calcula el hash del archivo) → si la imagen ya se usó
+    en una transacción no rechazada, se rechaza solo (antes era manual). Valida monto>0.
   - `resolver_transaccion(id, aprobar)` → **solo `is_admin`**; al aprobar ajusta `houses.saldo`
     **incremental** (abono −monto, cargo/ajuste +monto) y recalcula `estatus` (en_convenio manda).
     Idempotente (solo si estaba `pendiente`).

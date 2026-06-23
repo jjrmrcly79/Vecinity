@@ -111,7 +111,14 @@ export default function PagosPage() {
     setEnviando(true);
     try {
       let url: string | null = null;
+      let hash: string | null = null;
       if (file && houseId && coloniaId) {
+        // hash del archivo para detectar el mismo comprobante subido dos veces
+        const buf = await file.arrayBuffer();
+        const digest = await crypto.subtle.digest("SHA-256", buf);
+        hash = Array.from(new Uint8Array(digest))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
         const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
         const path = `${coloniaId}/${houseId}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabaseBrowser.storage.from(BUCKET).upload(path, file);
@@ -122,6 +129,7 @@ export default function PagosPage() {
         p_monto: m,
         p_comprobante_url: url,
         p_concepto: "Abono",
+        p_comprobante_hash: hash,
       });
       if (error) throw new Error(error.message.replace(/^.*?:\s/, ""));
       setOk("Abono enviado. El comité lo revisará.");
