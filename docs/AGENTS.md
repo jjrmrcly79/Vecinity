@@ -117,7 +117,13 @@ Mejora del `dashboard_admin` legacy. `/dashboard/comite` (rol admin/comité):
 - **Cobros mensuales + recargos (migración `018`)**: `generar_cobros_mensuales(periodo)` (CARGO de
   `colonias.cuota_mensual`=**$750** por casa, idempotente por periodo) y `aplicar_recargos(periodo)`
   (CARGO `colonias.recargo`=**$100** a quien sigue debiendo tras el día 10). Botones en el panel.
-  Pensados para el día 1 (cobros) / día 11 (recargos) — automatizables con n8n scheduleTrigger (pendiente confirmar).
+  Pensados para el día 1 (cobros) / día 11 (recargos).
+  - **Automatización n8n (migración `020`)**: helpers internos `_cobros_colonia`/`_recargos_colonia`
+    (reutilizados por el botón is_admin y por el cron) + wrappers `cron_generar_cobros(token)` /
+    `cron_aplicar_recargos(token)` (token-gated, anon key, mismo patrón que `cron_late_fees`; recorren
+    todas las colonias). Workflows n8n creados **INACTIVOS** (Daniel los activa):
+    `Vecinity - Cobros mensuales (día 1)` (`7m0eSC4jiCkky0CZ`, cron día 1 6am MX) y
+    `Vecinity - Recargos (día 11)` (`E7tp0Tn67bx0aSGa`, día 11 6am MX). Idempotentes.
 - **Convenios de pago (migración `019`)**: tabla `payment_plans` (monto semanal + deuda acordada);
   `crear_convenio`/`cerrar_convenio` (marca casa `en_convenio`) + `convenios_seguimiento()` →
   **esperado (semanas×monto) vs abonado** (abonos desde que inició) → al día / atrasado, con barra de
