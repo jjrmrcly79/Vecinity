@@ -1,0 +1,28 @@
+<svg width="420" height="120" viewBox="0 0 420 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vecinity">
+  <defs>
+    <linearGradient id="vShield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="0.55" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Emblema: escudo (seguridad) + casa (comunidad) -->
+  <g transform="translate(8,12)">
+    <path d="M48 2 L90 16 V52 C90 76 72 90 48 96 C24 90 6 76 6 52 V16 Z"
+          fill="url(#vShield)"/>
+    <!-- casa -->
+    <path d="M48 30 L72 49 H64 V70 H32 V49 H24 Z" fill="#ffffff"/>
+    <!-- puerta -->
+    <rect x="43" y="54" width="10" height="16" rx="1.5" fill="#10b981"/>
+    <!-- pulso / latido de comunidad -->
+    <path d="M18 80 H36 L41 71 L49 88 L55 80 H78" stroke="#ffffff" stroke-width="3.4"
+          stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(116,0)" font-family="'Inter','Segoe UI',system-ui,Arial,sans-serif">
+    <text x="0" y="62" font-size="50" font-weight="800" letter-spacing="-1.5" fill="#0f172a">Vecin<tspan fill="#10b981">ity</tspan></text>
+    <text x="2" y="90" font-size="16.5" font-weight="600" letter-spacing="3.2" fill="#64748b">COMUNIDAD SEGURA</text>
+  </g>
+</svg>
