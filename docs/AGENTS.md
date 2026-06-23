@@ -105,6 +105,34 @@ Migración `007_notifications.sql`. Token SOLO en `vecino.tg_send()` (SECURITY D
   vía wrapper `vecino.cron_late_fees(token)` (gate, anon key, sin service role). 53 pagos vencidos pendientes de correr.
 - Todo se registra en `vecino.notifications` (log/auditoría). pg_cron NO existe → schedule por n8n.
 
+## Pagos — ✅ abono + comprobante + aprobación comité (2026-06-23)
+Cuarta función de paridad (libro mayor `transactions`: cargo/abono/ajuste, 2427 tx reales).
+- **Bucket Storage `vecino-comprobantes`** (público, paths `colonia/casa/uuid.ext`) + políticas
+  `insert/select` para `authenticated` (creado vía `/pg/query` sobre `storage.objects`).
+- **Migración `012_pagos.sql`** (aplicada): RPCs SECURITY DEFINER:
+  - `registrar_abono(monto, comprobante_url, concepto)` → transacción `abono` `pendiente`;
+    anti-duplicado (mismo monto en 10 min); valida monto>0.
+  - `resolver_transaccion(id, aprobar)` → **solo `is_admin`**; al aprobar ajusta `houses.saldo`
+    **incremental** (abono −monto, cargo/ajuste +monto) y recalcula `estatus` (en_convenio manda).
+    Idempotente (solo si estaba `pendiente`).
+- **UI `/dashboard/pagos`** (role-aware): residente ve saldo, registra abono (sube comprobante a
+  Storage) y su lista de movimientos; comité ve **"Abonos por aprobar"** con ver comprobante +
+  aprobar/rechazar (al aprobar baja el saldo del residente). Link en dashboard.
+- `npm run build` limpio. **Nota seguridad (post-launch):** el bucket es público con paths uuid
+  (la URL solo se expone vía filas RLS por colonia); endurecer a signed URLs si se requiere.
+
+## Vehículos — ✅ alta/baja + aprobación comité (2026-06-23)
+Tercera función de paridad (285 vehículos reales; catálogo migrado 52 marcas / 351 modelos).
+- **Migración `011_vehiculos.sql`** (aplicada): RPCs SECURITY DEFINER:
+  - `agregar_vehiculo(placa, brand_id, model_id, color)` → estado `pendiente`; valida placa
+    no duplicada por colonia (`UNIQUE(colonia_id, placa)`), normaliza a mayúsculas.
+  - `eliminar_vehiculo(id)` → baja propia; **no** si ya está `aprobado` (lo da de baja el comité).
+- **UI `/dashboard/vehiculos`** (role-aware): residente da de alta (marca→modelo dependiente,
+  placa, color) + "Registrados" con estado + quitar; comité ve **"Vehículos por aprobar"** con
+  aprobar/rechazar + asignar **tarjeta RFID** (update directo vía política admin). Link en dashboard.
+- Catálogo `vehicle_brands`/`vehicle_models` legible por todos (RLS `true`). `vehicles` read por colonia, write admin.
+- `npm run build` limpio. **Pendiente (vista vigilante/OCR):** `vehicles.plate_ocr_confidence` + búsqueda de placa por el guardia.
+
 ## Reservas de áreas comunes — ✅ paridad + mejora (2026-06-23)
 Primera función de paridad sobre el Django viejo (659 reservas reales rescatadas como flujo, no como datos).
 - **Migración `008_reservas.sql`** (aplicada vía `/pg/query`):

@@ -171,8 +171,8 @@ export default function Dashboard() {
 
         {/* Acciones rápidas */}
         <div className="grid grid-cols-2 gap-3 mt-3">
-          <Action emoji="💳" label="Pagar / Subir comprobante" />
-          <Action emoji="🚗" label="Mis vehículos" />
+          <Action emoji="💳" label="Pagar / Subir comprobante" onClick={() => router.push("/dashboard/pagos")} />
+          <Action emoji="🚗" label="Mis vehículos" onClick={() => router.push("/dashboard/vehiculos")} />
           <Action emoji="👮" label="Registrar visita" onClick={() => router.push("/dashboard/visitas")} />
           <Action emoji="📣" label="Reportar incidencia" />
         </div>

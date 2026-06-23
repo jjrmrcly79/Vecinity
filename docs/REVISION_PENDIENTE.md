@@ -21,12 +21,12 @@ servicios al **estatus de pago**. → La paridad es requisito de lanzamiento, no
 |---|---|---|
 | Residente | **Reservar áreas comunes (con restricciones)** | ✅ — construido 2026-06-23 (ver AGENTS.md) |
 | Residente | Registrar visita (QR/token) + WhatsApp | ✅ — registro + pase QR/WhatsApp + pase público `/visita/[token]` (2026-06-23). Falta: captura fotos INE/placas + entrada/salida → **fase vista vigilante** |
-| Residente | Mis vehículos (alta/baja) | ❌ (placeholder) |
-| Residente | Pagar / subir comprobante de abono | ❌ (placeholder) |
+| Residente | Mis vehículos (alta/baja) | ✅ — alta (catálogo marcas/modelos) + baja + aprobación comité + RFID (2026-06-23) |
+| Residente | Pagar / subir comprobante de abono | ✅ — abono + comprobante a Storage + aprobación comité (ajusta saldo/estatus) (2026-06-23) |
 | Residente | Reportar incidencia (con foto) | ❌ (placeholder) |
 | Residente | Paquetes, propuestas/votos, marketplace, comunidad | ❌ |
 | Vigilante | **Vista completa** (entrada/salida visitas, placas, gafetes, paquetes, turnos) | ❌ (no existe) |
-| Comité/Admin | Aprobar pagos/vehículos, resolver multas, generar cobros, gastos, finanzas | ⚠️ solo aprobar vecinos |
+| Comité/Admin | Aprobar pagos/vehículos, resolver multas, generar cobros, gastos, finanzas | ⚠️ ✅ aprobar vecinos · ✅ aprobar vehículos · ✅ aprobar abonos · ✅ gestionar áreas/reservas. Falta: multas, generar cobros, gastos, finanzas |
 
 ## 📋 Áreas comunes — reglas del reglamento (VALIDAR antes de construir)
 Fuente: `Reglamento_Consolidado_Villa_Catania_2026.docx` (Anexos A y B).
