@@ -156,11 +156,24 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Reservar áreas comunes (función activa) */}
+        <button
+          onClick={() => router.push("/dashboard/reservas")}
+          className="mt-5 w-full rounded-3xl bg-white ring-1 ring-brand-200 p-4 flex items-center gap-3 text-left hover:ring-brand-300 transition shadow-sm"
+        >
+          <span className="text-3xl">🏖️</span>
+          <span>
+            <span className="block font-bold text-slate-800">Reservar áreas comunes</span>
+            <span className="block text-xs text-slate-500">Alberca y terraza · disponibilidad en vivo</span>
+          </span>
+          <span className="ml-auto text-brand-500 text-xl">›</span>
+        </button>
+
         {/* Acciones rápidas */}
-        <div className="grid grid-cols-2 gap-3 mt-5">
+        <div className="grid grid-cols-2 gap-3 mt-3">
           <Action emoji="💳" label="Pagar / Subir comprobante" />
           <Action emoji="🚗" label="Mis vehículos" />
-          <Action emoji="👮" label="Registrar visita" />
+          <Action emoji="👮" label="Registrar visita" onClick={() => router.push("/dashboard/visitas")} />
           <Action emoji="📣" label="Reportar incidencia" />
         </div>
 
@@ -175,6 +188,19 @@ export default function Dashboard() {
         {/* Panel comité — aprobaciones */}
         {isAdmin && (
           <section className="mt-7">
+            <button
+              onClick={() => router.push("/dashboard/areas")}
+              className="mb-3 w-full rounded-2xl bg-purple-50 ring-1 ring-purple-100 p-3.5 flex items-center gap-3 text-left hover:ring-purple-200 transition"
+            >
+              <span className="text-2xl">🏖️</span>
+              <span className="block font-semibold text-slate-800 text-sm">
+                Gestionar áreas comunes
+                <span className="block text-xs text-slate-500 font-normal">
+                  Reglas, horarios y aprobación de reservas
+                </span>
+              </span>
+              <span className="ml-auto text-nexia text-lg">›</span>
+            </button>
             <h2 className="text-sm font-bold text-slate-700 mb-2">
               Solicitudes pendientes{" "}
               <span className="text-slate-400 font-medium">({pending.length})</span>
@@ -229,9 +255,20 @@ export default function Dashboard() {
   );
 }
 
-function Action({ emoji, label }: { emoji: string; label: string }) {
+function Action({
+  emoji,
+  label,
+  onClick,
+}: {
+  emoji: string;
+  label: string;
+  onClick?: () => void;
+}) {
   return (
-    <button className="bg-white rounded-2xl p-4 ring-1 ring-slate-100 text-left hover:ring-brand-200 transition">
+    <button
+      onClick={onClick}
+      className="bg-white rounded-2xl p-4 ring-1 ring-slate-100 text-left hover:ring-brand-200 transition"
+    >
       <span className="text-2xl">{emoji}</span>
       <p className="text-sm font-medium text-slate-700 mt-2 leading-tight">{label}</p>
     </button>
