@@ -1,0 +1,40 @@
+{
+  "_meta": {
+    "fecha_respaldo": "2026-06-22",
+    "motivo": "Respaldo precautorio antes de limpiar el schema 'vecino' para reconstruir Vecinity unificado (condominio + vigilancia vecinal). Datos confirmados como PRUEBAS por Juan.",
+    "schema": "vecino",
+    "tablas_originales": ["alerts", "commerces", "profiles", "reports", "sos_events", "zones"]
+  },
+  "estructura": {
+    "zones": ["id text PK", "name text", "code text", "color text", "captain_id uuid", "member_count int", "lat float8", "lng float8", "created_at timestamptz"],
+    "profiles": ["id uuid PK", "name text", "role enum", "zone_id text", "phone text", "avatar text", "house text", "street text", "email text", "is_verified bool", "is_active bool", "approval_status enum", "rules_accepted_at timestamptz", "created_at timestamptz", "updated_at timestamptz"],
+    "sos_events": ["id uuid PK", "user_id uuid", "mode enum", "lat float8", "lng float8", "is_active bool", "activated_at timestamptz", "deactivated_at timestamptz"],
+    "alerts": ["id uuid PK", "category enum", "severity enum", "title text", "description text", "lat float8", "lng float8", "zone_id text", "author_id uuid", "status enum", "evidence array", "created_at timestamptz", "resolved_at timestamptz"],
+    "reports": ["id uuid PK", "alert_id uuid", "captain_id uuid", "description text", "status text", "response_time text", "created_at timestamptz"],
+    "commerces": ["id uuid PK", "name text", "type text", "address text", "phone text", "hours text", "lat float8", "lng float8", "zone_id text", "owner_id uuid", "is_safe_point bool", "is_active bool", "created_at timestamptz"]
+  },
+  "datos": {
+    "zones": [
+      {"id": "zone-rap-1773520034688", "code": "RAP", "name": "La Reserva Apeninos", "color": "#f97316", "member_count": 85, "created_at": "2026-03-14T20:29:24.933766+00:00"},
+      {"id": "zone-lomb-1773520998834", "code": "LOMB", "name": "Lombardia", "color": "#eab308", "member_count": 80, "created_at": "2026-03-14T20:43:19.034836+00:00"},
+      {"id": "zone-cat-1773516779683", "code": "CAT", "name": "La Cantera Villa Catania", "color": "#ef4444", "member_count": 116, "created_at": "2026-03-14T19:32:59.862729+00:00"}
+    ],
+    "profiles": [
+      {"id": "14e5b44d-e047-4b96-98ec-ba5a1b56ba41", "name": "dhiramnavarro", "email": "dhiramnavarro@hotmail.com", "role": "resident", "approval_status": "pending", "created_at": "2026-03-16T00:26:15.771625+00:00"},
+      {"id": "7ba94b4f-6867-405e-986e-5f6aed9fb65f", "name": "Juan Garcés", "email": "juanjose.garces@gmail.com", "role": "resident", "house": "Casa", "phone": "4611011745", "street": "Villa Catania No. 128", "zone_id": "zone-cat-1773516779683", "approval_status": "approved", "created_at": "2026-04-15T15:15:14.437074+00:00"},
+      {"id": "89988643-7882-4db8-abab-471666441827", "name": "rubengarcia1995x", "email": "rubengarcia1995x@gmail.com", "role": "resident", "approval_status": "pending", "created_at": "2026-04-15T15:26:01.207521+00:00"},
+      {"id": "b18cc5df-cc76-47da-9974-34804b037c5f", "name": "angelicabecha86", "email": "angelicabecha86@gmail.com", "role": "resident", "approval_status": "pending", "created_at": "2026-04-15T16:39:40.779709+00:00"},
+      {"id": "844f40d2-8d86-4af6-82bd-87997dabb98f", "name": "canteraapp7", "email": "canteraapp7@gmail.com", "role": "resident", "approval_status": "pending", "created_at": "2026-04-18T19:51:40.937703+00:00"},
+      {"id": "926bc642-3999-4d01-8d8c-558cb3f6e318", "name": "juan.garces", "email": "juan.garces@nexiasoluciones.com.mx", "role": "resident", "approval_status": "pending", "created_at": "2026-05-06T18:43:10.774169+00:00"},
+      {"id": "3d36bd5c-794f-49c1-a670-da4283338e90", "name": "dhiramnavarro", "email": "dhiramnavarro@gmail.com", "role": "resident", "approval_status": "pending", "created_at": "2026-05-12T01:00:06.559538+00:00"},
+      {"id": "b20c04d3-6af3-41a7-9e60-f2b3287c958a", "name": "naturalezamisticaaa", "email": "naturalezamisticaaa@gmail.com", "role": "resident", "approval_status": "pending", "created_at": "2026-06-12T02:34:08.48368+00:00"}
+    ],
+    "sos_events": [
+      {"id": "48c1a37b-aae1-4f5b-b89b-10c3437f9855", "user_id": "7ba94b4f-6867-405e-986e-5f6aed9fb65f", "mode": "loud", "lat": 19.430714387102, "lng": -99.1347535854743, "is_active": false, "activated_at": "2026-04-15T15:16:45.771443+00:00", "deactivated_at": "2026-04-15T15:17:45.303+00:00"},
+      {"id": "074d2550-135e-4097-99d9-843e9874511f", "user_id": "7ba94b4f-6867-405e-986e-5f6aed9fb65f", "mode": "silent", "lat": 19.4314478504989, "lng": -99.1320391268401, "is_active": false, "activated_at": "2026-04-15T19:36:31.927997+00:00", "deactivated_at": "2026-04-15T19:36:53.194+00:00"}
+    ],
+    "alerts": [],
+    "reports": [],
+    "commerces": []
+  }
+}
