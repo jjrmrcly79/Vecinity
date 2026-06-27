@@ -225,6 +225,17 @@ export default function PanelComite() {
               <p className="text-white/80 text-xs mt-1">{fin.alCorriente} al corriente</p>
             </div>
           </div>
+          <button
+            onClick={() => router.push("/dashboard/gastos")}
+            className="mt-3 w-full rounded-2xl bg-white ring-1 ring-slate-100 p-3.5 flex items-center gap-3 text-left hover:ring-brand-200 transition shadow-sm"
+          >
+            <span className="text-2xl">🧾</span>
+            <span>
+              <span className="block font-semibold text-slate-800 text-sm">Gastos de la colonia</span>
+              <span className="block text-xs text-slate-500">Registrar, desglose por categoría y export CSV</span>
+            </span>
+            <span className="ml-auto text-brand-500 text-lg">›</span>
+          </button>
         </section>
 
         {/* Cobros mensuales */}

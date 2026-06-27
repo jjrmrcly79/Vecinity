@@ -67,6 +67,19 @@ Cierra el pendiente #1 de lanzamiento. **Migración `021_caseta.sql`** (aplicada
   sellos) + aparece en Historial. `npm run build` limpio. 0 errores de consola.
 - **Pendiente caseta (post-lanzamiento):** OCR de placas (visión Claude, no Tesseract) · gafetes (nexia-print-bridge).
 
+## Finanzas — gastos de la colonia + dashboard + export CSV (2026-06-27) ✅
+- **Sin migración:** la tabla `vecino.colonia_expenses` ya existía (002, 15 gastos reales = $55,050) y su
+  política RLS `colonia_expenses_admin` (cmd ALL, `is_admin()`+colonia) permite que el **comité escriba
+  directo** desde el cliente. `is_admin()` cubre roles `admin` y `comite`. → feature **puro frontend**.
+- **Columnas:** concepto, monto, **categoria (text libre)**, fecha_pago (date), descripcion,
+  archivo_principal/secundario_url, registrado_por. No hay estado (los gastos solo se registran).
+- **Nueva página `/dashboard/gastos`** (guard admin/comité): total, **desglose por categoría** (barras CSS,
+  sin dep de charts), registrar gasto (concepto, monto, categoría con `<datalist>` de sugerencias,
+  fecha, comprobante a Storage `vecino-evidencias/gastos`), lista con borrar, y **export CSV**
+  (Blob client-side, con BOM UTF-8 para Excel). Enlazada desde el panel del comité (sección Finanzas).
+- **Verificado E2E** con `comite@cantera.test`: insert vía RLS ok (sello registrado_por), desglose y CSV. Build limpio.
+- **Pendiente finanzas (siguiente):** conciliación bancaria CSV (match depósito↔casa → abonos), censo.
+
 ## Qué es
 Producto unificado (decisión 2026-06-22) que fusiona dos ideas:
 - **Administración de condominio** (legacy Django `proyecto-condominio/`, "Villa Catania")

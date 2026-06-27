@@ -20,7 +20,7 @@
 11. [Botón de pánico (SOS)](#11-botón-de-pánico-sos)
 
 **Para el comité y la caseta**
-12. [Panel del comité](#12-panel-del-comité)
+12. [Panel del comité](#12-panel-del-comité) · [Gastos de la colonia](#gastos-de-la-colonia)
 13. [Gestionar áreas comunes](#13-gestionar-áreas-comunes)
 14. [Vista de vigilancia (caseta)](#14-vista-de-vigilancia-caseta)
 
@@ -175,6 +175,12 @@ Si eres parte del **comité** o **administración**, desde tu panel entras al **
 También apruebas a los nuevos vecinos desde **Solicitudes pendientes** en tu panel principal:
 
 <img src="screens/06-dashboard-comite.png" width="300" />
+
+### Gastos de la colonia
+
+Desde el panel del comité, en **Finanzas**, entras a **Gastos de la colonia**. Ahí registras cada gasto (concepto, monto, **categoría**, fecha y un **comprobante** opcional), ves el **total** y el **desglose por categoría**, y puedes **exportar todo a CSV** (para Excel o tu contador).
+
+<img src="screens/20-gastos.png" width="300" />
 
 ---
 
