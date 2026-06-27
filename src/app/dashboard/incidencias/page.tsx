@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { autoprocesarIncidencia } from "./actions";
 
 type Cat = { id: string; nombre: string; monto_base: number };
 type Reporte = {
@@ -75,6 +76,7 @@ export default function IncidenciasPage() {
   const [mios, setMios] = useState<Reporte[]>([]);
   const [pend, setPend] = useState<Reporte[]>([]);
   const [pendTotal, setPendTotal] = useState(0);
+  const [propuestas, setPropuestas] = useState<Reporte[]>([]);
 
   const cargarMios = useCallback(async (hid: string) => {
     const { data } = await supabaseBrowser
@@ -95,6 +97,16 @@ export default function IncidenciasPage() {
       .limit(50);
     setPend((data as unknown as Reporte[]) ?? []);
     setPendTotal(count ?? 0);
+  }, []);
+
+  const cargarPropuestas = useCallback(async () => {
+    const { data } = await supabaseBrowser
+      .from("incident_reports")
+      .select(REP_COLS)
+      .eq("estado", "propuesta")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setPropuestas((data as unknown as Reporte[]) ?? []);
   }, []);
 
   useEffect(() => {
@@ -125,10 +137,15 @@ export default function IncidenciasPage() {
         .order("nombre");
       setCats((c as unknown as Cat[]) ?? []);
       if (p.house_id) await cargarMios(p.house_id);
-      if (admin) await cargarPend();
+      if (admin) await Promise.all([cargarPend(), cargarPropuestas()]);
       setReady(true);
     })();
-  }, [router, cargarMios, cargarPend]);
+  }, [router, cargarMios, cargarPend, cargarPropuestas]);
+
+  async function votar(id: string, aprobar: boolean) {
+    await supabaseBrowser.rpc("votar_resolucion", { p_id: id, p_aprobar: aprobar });
+    setPropuestas((l) => l.filter((x) => x.id !== id));
+  }
 
   // resolver casa infractora por placa o número
   async function resolverInfractor(): Promise<{ id: string; numero: string } | null> {
@@ -174,7 +191,7 @@ export default function IncidenciasPage() {
         if (upErr) throw new Error("No se pudo subir la evidencia.");
         url = supabaseBrowser.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
       }
-      const { error } = await supabaseBrowser.rpc("reportar_incidencia", {
+      const { data: repData, error } = await supabaseBrowser.rpc("reportar_incidencia", {
         p_infractor: infr.id,
         p_categoria: catId,
         p_descripcion: desc.trim() || null,
@@ -183,7 +200,21 @@ export default function IncidenciasPage() {
         p_lng: geo?.lng ?? null,
       });
       if (error) throw new Error(error.message.replace(/^.*?:\s/, ""));
-      setOk(`Reporte enviado contra casa ${infr.numero}. El comité lo revisará.`);
+
+      let okMsg = `Reporte enviado contra casa ${infr.numero}. El comité lo revisará.`;
+      // Si hay placa escrita + foto, verificamos con OCR y auto-procesamos.
+      const newId = (repData as { id?: string } | null)?.id;
+      if (newId && placa.trim() && url) {
+        const auto = await autoprocesarIncidencia(newId, placa.trim().toUpperCase(), url);
+        if (auto.ok && auto.accion === "amonestacion") {
+          okMsg = "✅ Placa verificada por IA. Es la 1ª vez → se envió una amonestación a la casa infractora.";
+        } else if (auto.ok && auto.accion === "propuesta") {
+          okMsg = `✅ Placa verificada por IA (reincidencia). Se generó una propuesta de multa por ${money(
+            auto.monto ?? 0
+          )} para el voto del comité.`;
+        }
+      }
+      setOk(okMsg);
       setCatId("");
       setCasaNum("");
       setPlaca("");
@@ -303,6 +334,50 @@ export default function IncidenciasPage() {
             {enviando ? "Enviando…" : "Reportar incidencia"}
           </button>
         </section>
+
+        {/* Comité: propuestas automáticas (OCR) — esperan 1 voto */}
+        {isAdmin && propuestas.length > 0 && (
+          <section className="mt-7">
+            <h2 className="text-sm font-bold text-slate-700 mb-2">
+              ✨ Propuestas automáticas (IA){" "}
+              <span className="text-slate-400 font-medium">({propuestas.length})</span>
+            </h2>
+            <p className="text-xs text-slate-500 mb-2">
+              Placa verificada por OCR (reincidencia). Da 1 voto para aplicar la multa.
+            </p>
+            <ul className="flex flex-col gap-2">
+              {propuestas.map((r) => (
+                <li key={r.id} className="bg-white rounded-2xl p-3.5 ring-1 ring-purple-100">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 truncate">
+                        {r.categoria?.nombre ?? "Incidencia"} · Casa {r.infractor?.numero ?? "—"}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Multa propuesta · {fecha(r.created_at)}
+                      </p>
+                    </div>
+                    <p className="font-bold text-red-600 shrink-0">{money(Number(r.monto_multa))}</p>
+                  </div>
+                  <div className="flex gap-2 mt-2.5">
+                    <button
+                      onClick={() => votar(r.id, true)}
+                      className="flex-1 rounded-xl bg-red-500 text-white text-sm font-semibold px-3 py-2 hover:bg-red-600"
+                    >
+                      Aprobar (1 voto) → multar
+                    </button>
+                    <button
+                      onClick={() => votar(r.id, false)}
+                      className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Comité: por resolver */}
         {isAdmin && (

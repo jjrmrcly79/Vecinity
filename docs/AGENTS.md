@@ -122,7 +122,30 @@ lugar se captura metadata confiable **en el momento**, como dato estructurado a 
 - **`ANTHROPIC_API_KEY`:** ✅ configurada en `.env.local` **reusando la key de `nexia-tienda`** (misma cuenta
   Anthropic; ya la usa el bot/autocompletado de la tienda). Reporte IA **probado en vivo** (Claude generó el
   reporte real de junio 2026). ⚠️ Falta agregarla en **EasyPanel → Entorno** al momento del deploy.
-- **Pendiente (post-lanzamiento):** OCR de placas (visión Claude) sobre la foto de placas ya capturada.
+- **OCR de placas + multa semi-automática (2026-06-27)** ✅ — ver sección siguiente.
+
+## OCR de placas + multa semi-automática (2026-06-27) ✅
+Idea de Juan: validar la placa de la incidencia (OCR vs lo que captura el vecino vs tabla `vehicles`)
+y, si coincide, procesar — 1ª vez amonestar, reincidencia → multa auto que el comité confirma con 1 voto.
+- **Migraciones `024` (enum) + `025` (lógica):**
+  - `024`: agrega valores `amonestacion` y `propuesta` al enum `incident_status`. **GOTCHA:** `ALTER TYPE
+    ADD VALUE` no puede usarse en la misma transacción donde se agrega → va en migración aparte (la 025 corre después).
+  - `025`: columnas en `incident_reports` (`placa_reportada`, **`plate_detected`** —ojo: existía en `visitors`
+    pero NO en incident_reports, hubo que crearla—, `plate_ocr_confidence`, `auto_resuelta`, `voto_por`, `voto_at`).
+  - RPC `procesar_incidencia_auto(id, placa_reportada, plate_ocr, conf)` (SECURITY DEFINER, la llama la Server
+    Action con service_role): **match de 3 vías** con `_norm_placa` (OCR ≈ reportada ≈ `vehicles.placa` de la casa
+    infractora). Sin match → queda `pendiente`. Con match: 0 antecedentes (multa+amonestacion de esa casa+categoría)
+    → **amonestación** auto (sin monto, notifica Telegram); ≥1 → **propuesta** de multa (monto vía `sugerir_multa`).
+  - RPC `votar_resolucion(id, aprobar)` (is_admin): **1 voto** aprueba → crea CARGO + ajusta saldo (misma lógica
+    que `resolver_incidencia` multar) + notifica; rechaza → `rechazado`. Helper `_notify_infractor` (tg_send, ignora chat null).
+- **Server Action `incidencias/actions.ts` `autoprocesarIncidencia`:** descarga la foto, OCR con **Claude visión
+  `claude-opus-4-8`** (base64, pide JSON `{placa,confianza}`), llama al RPC. Key reusada de tienda. Corre al reportar
+  (decisión de Juan), solo si el vecino puso placa + foto.
+- **UI:** residente ve "✅ Placa verificada por IA → amonestación / propuesta"; comité ve sección **"✨ Propuestas
+  automáticas (IA)"** en `/dashboard/incidencias` con "Aprobar (1 voto) → multar" / "Rechazar".
+- **Verificado E2E** (placa GNY752F→casa 103, imagen de placa generada): #1 → amonestación (OCR conf 1.0), #2 →
+  propuesta $200 → comité votó → multa cargada. Build limpio, datos demo limpiados, saldo restaurado.
+- **Pendiente (post-lanzamiento):** OCR de placas en la **vista vigilante** (caseta) sobre la foto de visitas.
 
 ## Qué es
 Producto unificado (decisión 2026-06-22) que fusiona dos ideas:

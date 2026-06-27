@@ -153,6 +153,10 @@ Toca **Reportar incidencia** para avisar de un problema (ruido, mal uso de ameni
 
 > Tu reporte es **anónimo** para el infractor. El comité lo revisa y decide; si aplica multa, el monto sube por reincidencia (con un tope definido por tu colonia).
 
+> 🤖 **Verificación automática:** si reportas por **placa** con foto, la app **lee la placa con IA** y la valida contra los autos registrados. Si coincide: la **1ª vez** es solo una **amonestación**; en una **reincidencia** se genera una **propuesta de multa** que el comité aprueba con **un voto**. Al infractor se le avisa por Telegram.
+
+<img src="screens/25-incidencia-ocr-1.png" width="300" />
+
 ---
 
 ## 11. Botón de pánico (SOS)
