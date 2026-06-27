@@ -119,8 +119,9 @@ lugar se captura metadata confiable **en el momento**, como dato estructurado a 
 - **Verificado E2E**: residente reporta con **geo (lat/lng) + foto + hora sellada** → comité aplica multa →
   aparece en el reporte de junio con la hora exacta de la evidencia. Sin `ANTHROPIC_API_KEY`, el botón IA muestra
   un **error elegante** (no rompe). Build limpio. Datos demo limpiados (saldo restaurado).
-- ⚠️ **Pendiente de Juan:** agregar `ANTHROPIC_API_KEY` en `.env.local` (placeholder ya puesto) y en EasyPanel →
-  Entorno, para que la generación con IA funcione. Lo demás (captura, datos, página) ya opera sin la key.
+- **`ANTHROPIC_API_KEY`:** ✅ configurada en `.env.local` **reusando la key de `nexia-tienda`** (misma cuenta
+  Anthropic; ya la usa el bot/autocompletado de la tienda). Reporte IA **probado en vivo** (Claude generó el
+  reporte real de junio 2026). ⚠️ Falta agregarla en **EasyPanel → Entorno** al momento del deploy.
 - **Pendiente (post-lanzamiento):** OCR de placas (visión Claude) sobre la foto de placas ya capturada.
 
 ## Qué es
