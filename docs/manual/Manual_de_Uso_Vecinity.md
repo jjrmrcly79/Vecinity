@@ -20,7 +20,7 @@
 11. [Botón de pánico (SOS)](#11-botón-de-pánico-sos)
 
 **Para el comité y la caseta**
-12. [Panel del comité](#12-panel-del-comité) · [Gastos](#gastos-de-la-colonia) · [Conciliación bancaria](#conciliación-bancaria)
+12. [Panel del comité](#12-panel-del-comité) · [Gastos](#gastos-de-la-colonia) · [Conciliación bancaria](#conciliación-bancaria) · [Reporte de multas (IA)](#reporte-de-multas-ia)
 13. [Gestionar áreas comunes](#13-gestionar-áreas-comunes)
 14. [Vista de vigilancia (caseta)](#14-vista-de-vigilancia-caseta)
 
@@ -145,9 +145,11 @@ Toca **Pagar / Subir comprobante**. Ahí ves tu **saldo** y puedes **registrar u
 
 ## 10. Reportar una incidencia
 
-Toca **Reportar incidencia** para avisar de un problema (ruido, mal uso de amenidades, mascotas, fachada, etc.). Elige la **categoría**, indica la **casa o placa** del infractor, describe lo que pasó y adjunta una **foto** de evidencia.
+Toca **Reportar incidencia** para avisar de un problema (ruido, mal uso de amenidades, mascotas, fachada, etc.). Elige la **categoría**, indica la **casa o placa** del infractor, describe lo que pasó y **toma una foto** de evidencia con la cámara.
 
-<img src="screens/15-incidencias.png" width="300" />
+<img src="screens/22-incidencias-camara.png" width="300" />
+
+> 📸 Toma la foto **con la cámara** (no de la galería): la app guarda la **hora exacta** y, si lo permites, tu **ubicación**. Eso le sirve al comité para el reporte de multas.
 
 > Tu reporte es **anónimo** para el infractor. El comité lo revisa y decide; si aplica multa, el monto sube por reincidencia (con un tope definido por tu colonia).
 
@@ -187,6 +189,12 @@ Desde el panel del comité, en **Finanzas**, entras a **Gastos de la colonia**. 
 En **Finanzas → Conciliación bancaria** subes el **estado de cuenta del banco** (el Excel que descargas de BBVA) y la app lista cada **pago recibido**. Asignas cada pago a su **casa** (la app **recuerda** tus asignaciones y las sugiere la próxima vez), y al confirmar **se abona el saldo de esa casa automáticamente**. Los pagos ya importados antes se marcan para no duplicarlos.
 
 <img src="screens/21-conciliacion.png" width="300" />
+
+### Reporte de multas (IA)
+
+En **Finanzas → Reporte de multas (IA)**, eliges un **mes** y la app reúne todas las multas aplicadas en ese periodo (con su hora y lugar). Con un toque, la **inteligencia artificial redacta un reporte** claro: resumen, desglose por categoría, reincidencias y observaciones — listo para compartir con la comunidad.
+
+<img src="screens/23-reporte-multas.png" width="300" />
 
 ---
 

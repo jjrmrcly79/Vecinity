@@ -10,6 +10,9 @@ type Reporte = {
   id: string;
   descripcion: string | null;
   evidencia_url: string | null;
+  evidencia_capturada_at: string | null;
+  evidencia_lat: number | null;
+  evidencia_lng: number | null;
   estado: string;
   monto_multa: number;
   created_at: string;
@@ -24,9 +27,30 @@ const fecha = (iso: string) =>
   new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 
 const REP_COLS =
-  "id, descripcion, evidencia_url, estado, monto_multa, created_at, " +
+  "id, descripcion, evidencia_url, evidencia_capturada_at, evidencia_lat, evidencia_lng, " +
+  "estado, monto_multa, created_at, " +
   "infractor:houses!infractor_house_id(numero), categoria:fine_categories(nombre, monto_base), " +
   "reportante:houses!reportante_house_id(numero)";
+
+// Captura la ubicación al momento (opcional, no bloquea si se niega el permiso)
+function obtenerUbicacion(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    if (!("geolocation" in navigator)) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  });
+}
+
+const fechaHora = (iso: string) =>
+  new Date(iso).toLocaleString("es-MX", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 const BUCKET = "vecino-evidencias";
 
 export default function IncidenciasPage() {
@@ -141,7 +165,9 @@ export default function IncidenciasPage() {
       if (!infr) throw new Error("No encontré la casa infractora con esos datos.");
       setResuelta(`Casa ${infr.numero}`);
       let url: string | null = null;
+      let geo: { lat: number; lng: number } | null = null;
       if (file && coloniaId) {
+        geo = await obtenerUbicacion(); // pide permiso al momento de la captura
         const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
         const path = `${coloniaId}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabaseBrowser.storage.from(BUCKET).upload(path, file);
@@ -153,6 +179,8 @@ export default function IncidenciasPage() {
         p_categoria: catId,
         p_descripcion: desc.trim() || null,
         p_evidencia_url: url,
+        p_lat: geo?.lat ?? null,
+        p_lng: geo?.lng ?? null,
       });
       if (error) throw new Error(error.message.replace(/^.*?:\s/, ""));
       setOk(`Reporte enviado contra casa ${infr.numero}. El comité lo revisará.`);
@@ -246,13 +274,17 @@ export default function IncidenciasPage() {
             />
           </label>
           <label className="text-xs text-slate-500">
-            Evidencia (foto, opcional)
+            Evidencia — tómala con la cámara (recomendado)
             <input
               type="file"
               accept="image/*"
+              capture="environment"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="mt-1 w-full text-sm text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-brand-50 file:text-brand-700 file:px-3 file:py-2 file:font-semibold"
             />
+            <span className="block mt-1 text-[11px] text-slate-400">
+              Se guarda la hora exacta (y tu ubicación, si la permites) para el reporte.
+            </span>
           </label>
           {resuelta && <p className="text-xs text-slate-500">Infractor: {resuelta}</p>}
           {err && (
@@ -403,14 +435,31 @@ function ResolverItem({ r, onDone }: { r: Reporte; onDone: (id: string) => void 
         </p>
       )}
       {r.evidencia_url && (
-        <a
-          href={r.evidencia_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-brand-600 font-semibold underline"
-        >
-          Ver evidencia
-        </a>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <a
+            href={r.evidencia_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-brand-600 font-semibold underline"
+          >
+            Ver evidencia
+          </a>
+          {r.evidencia_capturada_at && (
+            <span className="text-[11px] text-slate-500">
+              📸 {fechaHora(r.evidencia_capturada_at)}
+            </span>
+          )}
+          {r.evidencia_lat != null && r.evidencia_lng != null && (
+            <a
+              href={`https://maps.google.com/?q=${r.evidencia_lat},${r.evidencia_lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-brand-600 underline"
+            >
+              📍 ubicación
+            </a>
+          )}
+        </div>
       )}
       <div className="flex gap-2 mt-2.5">
         <div className="flex items-center gap-1 flex-1">

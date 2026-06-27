@@ -102,6 +102,27 @@ suben el estado de cuenta BBVA (Excel) y asignan cada **abono** a su casa. **Ins
 - **Pendiente finanzas (siguiente):** detección de multas (pago > cuota) en la conciliación · importar egresos
   del mismo estado de cuenta (auto-categorizar) · censo.
 
+## Multas — evidencia confiable + reporte mensual con IA (2026-06-27) ✅
+Idea de Juan: la foto de la multa debe traer hora/lugar para el reporte. **Corrección técnica clave:** NO depender
+del EXIF (los navegadores —iOS sobre todo— lo borran, la compresión lo destruye, y se puede falsificar). En su
+lugar se captura metadata confiable **en el momento**, como dato estructurado a prueba de manipulación.
+- **Migración `023_evidencia_multas.sql`** (aplicada): columnas `incident_reports.evidencia_capturada_at`
+  (sellada por el **servidor** con `now()` al crear el reporte), `evidencia_lat`, `evidencia_lng`. Se reemplazó
+  `reportar_incidencia` (DROP de la firma vieja de 4 args) por una de 6 args con `p_lat`/`p_lng`.
+- **UI incidencias:** input de evidencia con **`capture="environment"`** (fuerza la cámara, no la galería) +
+  `navigator.geolocation` (opcional, con permiso) → pasa lat/lng a la RPC. El comité ve la **hora exacta**
+  (📸) y un link **📍 ubicación** (Google Maps) en la resolución.
+- **Reporte IA `/dashboard/reporte-multas`** (comité): elige periodo (mes) → carga las multas (`estado='multa'`,
+  `resolved_at` en el mes) vía RLS en el cliente → **Server Action** `generarReporteMultas` llama a **Claude
+  (`claude-opus-4-8`, SDK `@anthropic-ai/sdk`)** y devuelve el reporte en Markdown. **La API key vive solo en el
+  servidor** (el cliente solo manda las filas ya filtradas por RLS, nunca la key).
+- **Verificado E2E**: residente reporta con **geo (lat/lng) + foto + hora sellada** → comité aplica multa →
+  aparece en el reporte de junio con la hora exacta de la evidencia. Sin `ANTHROPIC_API_KEY`, el botón IA muestra
+  un **error elegante** (no rompe). Build limpio. Datos demo limpiados (saldo restaurado).
+- ⚠️ **Pendiente de Juan:** agregar `ANTHROPIC_API_KEY` en `.env.local` (placeholder ya puesto) y en EasyPanel →
+  Entorno, para que la generación con IA funcione. Lo demás (captura, datos, página) ya opera sin la key.
+- **Pendiente (post-lanzamiento):** OCR de placas (visión Claude) sobre la foto de placas ya capturada.
+
 ## Qué es
 Producto unificado (decisión 2026-06-22) que fusiona dos ideas:
 - **Administración de condominio** (legacy Django `proyecto-condominio/`, "Villa Catania")
