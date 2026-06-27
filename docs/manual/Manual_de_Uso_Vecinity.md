@@ -217,7 +217,7 @@ El **guardia** entra directo a su pantalla de operación. Desde ahí controla to
 - **Turno**: iniciar y cerrar turno.
 - **Buscar placa** de un vehículo registrado.
 - **Visitas**: marcar **entrada / salida** (incluye los pases QR que generan los vecinos). Antes de la entrada, el guardia puede tomar una **foto del INE** 📷.
-- **Registrar visita en caseta** (botón **+ En caseta**): para un visitante que llega **sin pase**. Captura su nombre, casa destino, placa y **fotos de INE y placas**.
+- **Registrar visita en caseta** (botón **+ En caseta**): para un visitante que llega **sin pase**. Captura su nombre, casa destino, placa y **fotos de INE y placas**. Al tomar la **foto de placas**, la app **lee la placa con IA** 🚘 y la registra automáticamente.
 - **Reservas de hoy**: entregar y recibir la llave del área.
 - **Servicios de la villa** (alberca, limpieza, basura, jardinería), **proveedores recurrentes** y **paquetes**.
 - **Historial de hoy**: todas las entradas y salidas del día, con acceso a las fotos de INE/placas.

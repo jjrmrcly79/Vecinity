@@ -145,7 +145,23 @@ y, si coincide, procesar — 1ª vez amonestar, reincidencia → multa auto que 
   automáticas (IA)"** en `/dashboard/incidencias` con "Aprobar (1 voto) → multar" / "Rechazar".
 - **Verificado E2E** (placa GNY752F→casa 103, imagen de placa generada): #1 → amonestación (OCR conf 1.0), #2 →
   propuesta $200 → comité votó → multa cargada. Build limpio, datos demo limpiados, saldo restaurado.
-- **Pendiente (post-lanzamiento):** OCR de placas en la **vista vigilante** (caseta) sobre la foto de visitas.
+- **OCR de placas en caseta (visitas) — 2026-06-27** ✅ — ver sección siguiente.
+
+## OCR de placas en caseta / visitas (2026-06-27) ✅
+Cuando el guardia toma la **foto de placas** al registrar una visita manual, una Server Action lee la placa
+con visión de Claude y la guarda. Los visitantes son externos (no están en `vehicles`) → el valor es
+**capturar la placa para la bitácora** + cotejarla con lo que el guardia escribió (auto-llenado + calidad).
+- **Migración `026`:** `visitors.plate_ocr` + `plate_ocr_confidence`; RPC `set_visita_plate(id, plate, conf)`
+  (SECURITY DEFINER, is_guard): guarda `plate_ocr`, auto-llena `plate_detected` si venía vacía, y devuelve
+  si coincide con la placa escrita. (`plate_detected` ya existía en visitors = placa de registro.)
+- **Refactor DRY:** se extrajo el OCR a `src/lib/ocr.ts` (`leerPlacaDeImagen`, server-only, Claude `claude-opus-4-8`).
+  Lo usan la Server Action de incidencias (`autoprocesarIncidencia`) y la nueva de vigilancia (`leerPlaca`).
+- **UI `/vigilancia`:** al registrar visita manual con foto de placas → OCR → `set_visita_plate`; el **Historial
+  de hoy** muestra la placa leída (🚘). Seguridad: el OCR (Server Action) no escribe BD; la escritura va por
+  RPC gateada por is_guard con el JWT del guardia.
+- **Verificado E2E** (guardia registra "Visitante OCR" con foto placa XYZ987C → plate_ocr='XYZ987C' conf 0.99,
+  historial lo muestra). Build limpio, demo limpiado.
+- **Pendiente (mejora):** OCR también al marcar entrada de un pase QR (hoy solo en registro manual de caseta).
 
 ## Qué es
 Producto unificado (decisión 2026-06-22) que fusiona dos ideas:

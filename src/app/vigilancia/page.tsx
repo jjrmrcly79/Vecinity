@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { leerPlaca } from "./actions";
 
 type Visita = {
   id: string;
@@ -20,6 +21,7 @@ type HistVisita = {
   fecha_hora_salida: string | null;
   foto_identificacion_url: string | null;
   foto_placas_url: string | null;
+  plate_detected: string | null;
   house: { numero: string } | null;
 };
 type Reserva = {
@@ -166,7 +168,7 @@ export default function VigilanciaPage() {
     const { data } = await supabaseBrowser
       .from("visitors")
       .select(
-        "id, nombre, estado, fecha_hora_entrada, fecha_hora_salida, foto_identificacion_url, foto_placas_url, house:houses(numero)"
+        "id, nombre, estado, fecha_hora_entrada, fecha_hora_salida, foto_identificacion_url, foto_placas_url, plate_detected, house:houses(numero)"
       )
       .gte("fecha_hora_entrada", hoy.toISOString())
       .order("fecha_hora_entrada", { ascending: false })
@@ -333,15 +335,31 @@ export default function VigilanciaPage() {
     }
     const ineUrl = mvIne ? await subirFoto(mvIne, "visitas") : null;
     const placaUrl = mvPlacaFoto ? await subirFoto(mvPlacaFoto, "visitas") : null;
-    const { error } = await supabaseBrowser.rpc("registrar_visita_manual", {
+    const { data: regData, error } = await supabaseBrowser.rpc("registrar_visita_manual", {
       p_nombre: mvNombre.trim(),
       p_house_id: house.id,
       p_placa: mvPlaca.trim() || null,
       p_foto_ine_url: ineUrl,
       p_foto_placa_url: placaUrl,
     });
+    if (error) {
+      setMvBusy(false);
+      return setMvMsg(error.message.replace(/^.*?:\s/, ""));
+    }
+
+    // OCR de la placa con IA (si hay foto de placas)
+    const newId = (regData as { id?: string } | null)?.id;
+    if (newId && placaUrl) {
+      const ocr = await leerPlaca(placaUrl);
+      if (ocr.ok && ocr.plate) {
+        await supabaseBrowser.rpc("set_visita_plate", {
+          p_id: newId,
+          p_plate: ocr.plate,
+          p_confidence: ocr.conf,
+        });
+      }
+    }
     setMvBusy(false);
-    if (error) return setMvMsg(error.message.replace(/^.*?:\s/, ""));
     setMvNombre("");
     setMvCasa("");
     setMvPlaca("");
@@ -875,6 +893,7 @@ export default function VigilanciaPage() {
                     <p className="text-xs text-slate-500">
                       {h.fecha_hora_entrada ? `Entró ${hora(h.fecha_hora_entrada)}` : "—"}
                       {h.fecha_hora_salida ? ` · Salió ${hora(h.fecha_hora_salida)}` : ""}
+                      {h.plate_detected ? ` · 🚘 ${h.plate_detected}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
