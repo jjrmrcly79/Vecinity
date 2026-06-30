@@ -533,6 +533,7 @@ export default function VigilanciaPage() {
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={(e) => setMvIne(e.target.files?.[0] ?? null)}
                     className="mt-1 w-full text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:px-2 file:py-1.5 file:font-semibold"
                   />
@@ -542,6 +543,7 @@ export default function VigilanciaPage() {
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={(e) => setMvPlacaFoto(e.target.files?.[0] ?? null)}
                     className="mt-1 w-full text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:px-2 file:py-1.5 file:font-semibold"
                   />
@@ -586,6 +588,7 @@ export default function VigilanciaPage() {
                         <input
                           type="file"
                           accept="image/*"
+                    capture="environment"
                           className="hidden"
                           onChange={(e) => {
                             const f = e.target.files?.[0];
@@ -734,6 +737,7 @@ export default function VigilanciaPage() {
                 <input
                   type="file"
                   accept="image/*"
+                    capture="environment"
                   onChange={(e) => setNpFile(e.target.files?.[0] ?? null)}
                   className="flex-1 text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:px-2 file:py-1.5 file:font-semibold"
                 />
@@ -797,6 +801,7 @@ export default function VigilanciaPage() {
                           <input
                             type="file"
                             accept="image/*"
+                    capture="environment"
                             className="hidden"
                             onChange={(e) => {
                               const f = e.target.files?.[0];
