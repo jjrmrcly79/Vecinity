@@ -226,8 +226,19 @@ export default function PanelComite() {
             </div>
           </div>
           <button
-            onClick={() => router.push("/dashboard/gastos")}
+            onClick={() => router.push("/dashboard/estado-cuenta")}
             className="mt-3 w-full rounded-2xl bg-white ring-1 ring-slate-100 p-3.5 flex items-center gap-3 text-left hover:ring-brand-200 transition shadow-sm"
+          >
+            <span className="text-2xl">📋</span>
+            <span>
+              <span className="block font-semibold text-slate-800 text-sm">Estado de cuenta por casa</span>
+              <span className="block text-xs text-slate-500">Busca una casa y revisa sus cargos y pagos</span>
+            </span>
+            <span className="ml-auto text-brand-500 text-lg">›</span>
+          </button>
+          <button
+            onClick={() => router.push("/dashboard/gastos")}
+            className="mt-2 w-full rounded-2xl bg-white ring-1 ring-slate-100 p-3.5 flex items-center gap-3 text-left hover:ring-brand-200 transition shadow-sm"
           >
             <span className="text-2xl">🧾</span>
             <span>
