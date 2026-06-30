@@ -74,6 +74,8 @@ const GENERALES = [
   { key: "jardineria", label: "Jardinería", emoji: "🌿" },
 ];
 const BUCKET_SVC = "vecino-evidencias";
+// Umbral de adeudo para restringir servicios extra a una casa (pesos)
+const SALDO_RESTRINGIDO = 1000;
 
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
@@ -222,10 +224,12 @@ export default function VigilanciaPage() {
   }, []);
 
   const cargarMorosos = useCallback(async () => {
+    // Solo casas con adeudo arriba del umbral; las que ya tienen convenio de pago no se restringen.
     const { data } = await supabaseBrowser
       .from("houses")
       .select("id, numero, propietario, saldo")
-      .gt("saldo", 0)
+      .gt("saldo", SALDO_RESTRINGIDO)
+      .neq("estatus", "en_convenio")
       .order("saldo", { ascending: false })
       .limit(60);
     setMorosos((data as unknown as Moroso[]) ?? []);
@@ -892,37 +896,6 @@ export default function VigilanciaPage() {
           </div>
         </section>
 
-        {/* Morosos / servicios restringidos (casas con adeudo) */}
-        {morosos.length > 0 && (
-          <section className="mt-6">
-            <h2 className="text-lg font-bold text-red-700 mb-2">
-              Servicios restringidos{" "}
-              <span className="text-red-400 font-medium">({morosos.length})</span>
-            </h2>
-            <div className="bg-red-50 ring-1 ring-red-200 rounded-2xl p-3">
-              <p className="text-base text-red-700 mb-2">
-                Casas con adeudo — no permitir el ingreso de servicios extra (proveedores no esenciales).
-              </p>
-              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {morosos.map((m) => (
-                  <li
-                    key={m.id}
-                    className="bg-white rounded-xl p-2.5 ring-1 ring-red-100 flex items-center justify-between gap-2"
-                  >
-                    <span className="text-base font-semibold text-slate-800 truncate">
-                      Casa {m.numero}
-                      {m.propietario ? ` · ${m.propietario}` : ""}
-                    </span>
-                    <span className="text-base font-bold text-red-600 shrink-0">
-                      ${Number(m.saldo).toLocaleString("es-MX")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        )}
-
         {/* Servicios recurrentes (domésticos) */}
         <section className="mt-6">
           <div className="flex items-center justify-between mb-2">
@@ -1170,6 +1143,38 @@ export default function VigilanciaPage() {
             </ul>
           )}
         </section>
+
+        {/* Servicios restringidos (morosos) — al final del dashboard */}
+        {morosos.length > 0 && (
+          <section className="mt-6 mb-6">
+            <h2 className="text-lg font-bold text-red-700 mb-2">
+              Servicios restringidos{" "}
+              <span className="text-red-400 font-medium">({morosos.length})</span>
+            </h2>
+            <div className="bg-red-50 ring-1 ring-red-200 rounded-2xl p-3">
+              <p className="text-base text-red-700 mb-2">
+                Casas con adeudo mayor a ${SALDO_RESTRINGIDO.toLocaleString("es-MX")} — no permitir
+                el ingreso de servicios extra (proveedores no esenciales).
+              </p>
+              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {morosos.map((m) => (
+                  <li
+                    key={m.id}
+                    className="bg-white rounded-xl p-2.5 ring-1 ring-red-100 flex items-center justify-between gap-2"
+                  >
+                    <span className="text-base font-semibold text-slate-800 truncate">
+                      Casa {m.numero}
+                      {m.propietario ? ` · ${m.propietario}` : ""}
+                    </span>
+                    <span className="text-base font-bold text-red-600 shrink-0">
+                      ${Number(m.saldo).toLocaleString("es-MX")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
       </div>
 
       {conoFor && (
