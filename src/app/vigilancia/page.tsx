@@ -422,7 +422,7 @@ export default function VigilanciaPage() {
 
   return (
     <main className="flex-1 bg-gradient-to-b from-slate-50 via-white to-sky-50">
-      <div className="w-full max-w-md mx-auto px-5 py-6 flex flex-col">
+      <div className="w-full max-w-md md:max-w-5xl mx-auto px-5 py-6 flex flex-col">
         <div className="flex items-center justify-between">
           <button
             onClick={() => router.push("/dashboard")}
@@ -453,8 +453,10 @@ export default function VigilanciaPage() {
           </button>
         </div>
 
+        {/* Secciones operativas: 1 columna en teléfono, 2 columnas (masonry) en tablet */}
+        <div className="md:columns-2 md:gap-x-5">
         {/* Buscar placa */}
-        <section className="mt-5">
+        <section className="mt-5 break-inside-avoid">
           <h2 className="text-sm font-bold text-slate-700 mb-2">Buscar placa</h2>
           <div className="flex gap-2">
             <input
@@ -491,7 +493,7 @@ export default function VigilanciaPage() {
         </section>
 
         {/* Visitas */}
-        <section className="mt-6">
+        <section className="mt-6 break-inside-avoid">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-700">
               Visitas <span className="text-slate-400 font-medium">({visitas.length})</span>
@@ -618,7 +620,7 @@ export default function VigilanciaPage() {
         </section>
 
         {/* Reservas (ciclo de llave) */}
-        <section className="mt-6">
+        <section className="mt-6 break-inside-avoid">
           <h2 className="text-sm font-bold text-slate-700 mb-2">
             Reservas de hoy <span className="text-slate-400 font-medium">({reservas.length})</span>
           </h2>
@@ -663,7 +665,7 @@ export default function VigilanciaPage() {
         </section>
 
         {/* Servicios de la villa */}
-        <section className="mt-6">
+        <section className="mt-6 break-inside-avoid">
           <h2 className="text-sm font-bold text-slate-700 mb-2">Servicios de la villa</h2>
           <div className="grid grid-cols-2 gap-2">
             {GENERALES.map((g) => {
@@ -693,7 +695,7 @@ export default function VigilanciaPage() {
         </section>
 
         {/* Servicios recurrentes (domésticos) */}
-        <section className="mt-6">
+        <section className="mt-6 break-inside-avoid">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-700">
               Recurrentes <span className="text-slate-400 font-medium">({providers.length})</span>
@@ -825,7 +827,7 @@ export default function VigilanciaPage() {
         </section>
 
         {/* Paquetes */}
-        <section className="mt-6 mb-4">
+        <section className="mt-6 mb-4 break-inside-avoid">
           <h2 className="text-sm font-bold text-slate-700 mb-2">
             Paquetes <span className="text-slate-400 font-medium">({paquetes.length})</span>
           </h2>
@@ -876,7 +878,7 @@ export default function VigilanciaPage() {
         </section>
 
         {/* Historial de hoy */}
-        <section className="mt-6 mb-6">
+        <section className="mt-6 mb-6 break-inside-avoid">
           <h2 className="text-sm font-bold text-slate-700 mb-2">
             Historial de hoy <span className="text-slate-400 font-medium">({historial.length})</span>
           </h2>
@@ -939,6 +941,7 @@ export default function VigilanciaPage() {
             </ul>
           )}
         </section>
+        </div>
       </div>
     </main>
   );
