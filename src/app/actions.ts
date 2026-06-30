@@ -99,7 +99,9 @@ export async function completeOnboarding(input: {
       role: inv.role ?? "residente",
       colonia_id: inv.colonia?.id ?? null,
       house_id: inv.houseId ?? null,
-      approval_status: "pendiente",
+      // El código de invitación CAT-<casa> ya prueba identidad (lo entregó el comité
+      // a esa casa) → auto-aprobado, entra directo al dashboard sin pasar por /esperando.
+      approval_status: "aprobado",
     },
     { onConflict: "id" }
   );
