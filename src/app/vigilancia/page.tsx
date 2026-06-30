@@ -292,6 +292,11 @@ export default function VigilanciaPage() {
     await cargarRecurrentes();
   }
 
+  async function salir() {
+    await supabaseBrowser.auth.signOut();
+    router.replace("/login");
+  }
+
   async function turno(accion: "iniciar" | "cerrar") {
     await supabaseBrowser.rpc(accion === "iniciar" ? "iniciar_turno" : "cerrar_turno");
     const {
@@ -431,6 +436,12 @@ export default function VigilanciaPage() {
             ← Volver
           </button>
           <Image src="/brand/vecinity-logo.svg" alt="Vecinity" width={120} height={34} priority />
+          <button
+            onClick={salir}
+            className="text-xs text-slate-400 hover:text-slate-600"
+          >
+            Salir
+          </button>
         </div>
 
         <h1 className="text-2xl font-bold text-slate-800 mt-4">Vigilancia</h1>
