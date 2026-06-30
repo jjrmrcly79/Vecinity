@@ -57,6 +57,15 @@ type Provider = {
   house: { numero: string } | null;
 };
 type ExtSvc = { id: string; provider_id: string | null; house: { numero: string } | null };
+type CasaDir = {
+  id: string;
+  numero: string;
+  propietario: string | null;
+  tel_1: string | null;
+  tel_2: string | null;
+  tel_3: string | null;
+};
+type Moroso = { id: string; numero: string; propietario: string | null; saldo: number };
 
 const GENERALES = [
   { key: "alberca", label: "Alberca", emoji: "🏊" },
@@ -112,6 +121,20 @@ export default function VigilanciaPage() {
   const [npCasa, setNpCasa] = useState("");
   const [npFile, setNpFile] = useState<File | null>(null);
   const [npMsg, setNpMsg] = useState<string | null>(null);
+
+  // Directorio de teléfonos (buscar casa → ver/editar tel_1/2/3)
+  const [dirQ, setDirQ] = useState("");
+  const [dirCasa, setDirCasa] = useState<CasaDir | null>(null);
+  const [dirMsg, setDirMsg] = useState<string | null>(null);
+  const [dirBusy, setDirBusy] = useState(false);
+
+  // Morosos / servicios restringidos (casas con saldo > 0)
+  const [morosos, setMorosos] = useState<Moroso[]>([]);
+
+  // Cono asignado a una visita al ingresar (se guarda en localStorage del dispositivo)
+  const [conos, setConos] = useState<Record<string, string>>({});
+  const [conoFor, setConoFor] = useState<string | null>(null);
+  const [conoVal, setConoVal] = useState("");
 
   const cargarTurno = useCallback(async (uid: string) => {
     const { data } = await supabaseBrowser
@@ -198,6 +221,92 @@ export default function VigilanciaPage() {
     setActivos((act as unknown as ExtSvc[]) ?? []);
   }, []);
 
+  const cargarMorosos = useCallback(async () => {
+    const { data } = await supabaseBrowser
+      .from("houses")
+      .select("id, numero, propietario, saldo")
+      .gt("saldo", 0)
+      .order("saldo", { ascending: false })
+      .limit(60);
+    setMorosos((data as unknown as Moroso[]) ?? []);
+  }, []);
+
+  // Hidratar los conos guardados en este dispositivo
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("vigilancia_conos");
+      if (raw) setConos(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function guardarCono() {
+    if (!conoFor) return;
+    setConos((prev) => {
+      const next = { ...prev };
+      const val = conoVal.trim();
+      if (val) next[conoFor] = val;
+      else delete next[conoFor];
+      try {
+        localStorage.setItem("vigilancia_conos", JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    setConoFor(null);
+    setConoVal("");
+  }
+
+  function quitarCono() {
+    if (!conoFor) return;
+    const id = conoFor;
+    setConos((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      try {
+        localStorage.setItem("vigilancia_conos", JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    setConoFor(null);
+    setConoVal("");
+  }
+
+  async function buscarDirectorio() {
+    const q = dirQ.trim();
+    setDirMsg(null);
+    setDirCasa(null);
+    if (!q) return;
+    const { data } = await supabaseBrowser
+      .from("houses")
+      .select("id, numero, propietario, tel_1, tel_2, tel_3")
+      .eq("numero", q)
+      .maybeSingle();
+    if (!data) {
+      setDirMsg("No se encontró esa casa.");
+      return;
+    }
+    setDirCasa(data as unknown as CasaDir);
+  }
+
+  async function guardarTelefonos() {
+    if (!dirCasa) return;
+    setDirBusy(true);
+    setDirMsg(null);
+    const { error } = await supabaseBrowser.rpc("actualizar_telefonos_casa", {
+      p_house_id: dirCasa.id,
+      p_tel_1: dirCasa.tel_1 ?? "",
+      p_tel_2: dirCasa.tel_2 ?? "",
+      p_tel_3: dirCasa.tel_3 ?? "",
+    });
+    setDirBusy(false);
+    setDirMsg(error ? error.message : "Teléfonos guardados ✓");
+  }
+
   useEffect(() => {
     (async () => {
       const {
@@ -225,10 +334,11 @@ export default function VigilanciaPage() {
         cargarGenerales(),
         cargarRecurrentes(),
         cargarHistorial(),
+        cargarMorosos(),
       ]);
       setReady(true);
     })();
-  }, [router, cargarTurno, cargarVisitas, cargarReservas, cargarPaquetes, cargarGenerales, cargarRecurrentes, cargarHistorial]);
+  }, [router, cargarTurno, cargarVisitas, cargarReservas, cargarPaquetes, cargarGenerales, cargarRecurrentes, cargarHistorial, cargarMorosos]);
 
   async function subirFoto(file: File, sub: string): Promise<string | null> {
     if (!coloniaId) return null;
@@ -502,6 +612,63 @@ export default function VigilanciaPage() {
           )}
         </section>
 
+        {/* Directorio de teléfonos */}
+        <section className="mt-6">
+          <h2 className="text-lg font-bold text-slate-700 mb-2">Directorio</h2>
+          <div className="flex gap-2">
+            <input
+              value={dirQ}
+              onChange={(e) => setDirQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && buscarDirectorio()}
+              placeholder="N° de casa"
+              className="flex-1 rounded-xl ring-1 ring-slate-200 px-3 py-2 text-base text-slate-800 outline-none focus:ring-2 focus:ring-brand-300"
+            />
+            <button
+              onClick={buscarDirectorio}
+              className="rounded-xl bg-slate-700 text-white text-base font-semibold px-4 py-2"
+            >
+              Buscar
+            </button>
+          </div>
+          {dirCasa && (
+            <div className="bg-white rounded-2xl ring-1 ring-slate-100 p-3 mt-2 flex flex-col gap-2">
+              <p className="text-lg font-semibold text-slate-800">
+                Casa {dirCasa.numero}
+                {dirCasa.propietario ? ` · ${dirCasa.propietario}` : ""}
+              </p>
+              <input
+                value={dirCasa.tel_1 ?? ""}
+                onChange={(e) => setDirCasa({ ...dirCasa, tel_1: e.target.value })}
+                placeholder="Teléfono 1"
+                inputMode="tel"
+                className="rounded-xl ring-1 ring-slate-200 px-3 py-2 text-base text-slate-800 outline-none focus:ring-2 focus:ring-brand-300"
+              />
+              <input
+                value={dirCasa.tel_2 ?? ""}
+                onChange={(e) => setDirCasa({ ...dirCasa, tel_2: e.target.value })}
+                placeholder="Teléfono 2"
+                inputMode="tel"
+                className="rounded-xl ring-1 ring-slate-200 px-3 py-2 text-base text-slate-800 outline-none focus:ring-2 focus:ring-brand-300"
+              />
+              <input
+                value={dirCasa.tel_3 ?? ""}
+                onChange={(e) => setDirCasa({ ...dirCasa, tel_3: e.target.value })}
+                placeholder="Teléfono 3"
+                inputMode="tel"
+                className="rounded-xl ring-1 ring-slate-200 px-3 py-2 text-base text-slate-800 outline-none focus:ring-2 focus:ring-brand-300"
+              />
+              <button
+                onClick={guardarTelefonos}
+                disabled={dirBusy}
+                className="rounded-xl bg-brand-500 text-white text-base font-semibold py-2 hover:bg-brand-600 disabled:opacity-40"
+              >
+                {dirBusy ? "Guardando…" : "Guardar teléfonos"}
+              </button>
+            </div>
+          )}
+          {dirMsg && <p className="text-base text-slate-500 mt-1">{dirMsg}</p>}
+        </section>
+
         {/* Visitas */}
         <section className="mt-6">
           <div className="flex items-center justify-between mb-2">
@@ -589,6 +756,27 @@ export default function VigilanciaPage() {
                       Casa {v.house?.numero ?? "—"}
                       {v.fecha_programada ? ` · ${hora(v.fecha_programada)}` : ""}
                     </p>
+                    {conos[v.id] ? (
+                      <button
+                        onClick={() => {
+                          setConoFor(v.id);
+                          setConoVal(conos[v.id] ?? "");
+                        }}
+                        className="mt-1 text-base font-bold text-amber-600"
+                      >
+                        🔶 Cono {conos[v.id]} · editar
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setConoFor(v.id);
+                          setConoVal("");
+                        }}
+                        className="mt-1 text-base text-slate-400 underline"
+                      >
+                        + Asignar cono
+                      </button>
+                    )}
                   </div>
                   {v.estado === "esperando" ? (
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -703,6 +891,37 @@ export default function VigilanciaPage() {
             })}
           </div>
         </section>
+
+        {/* Morosos / servicios restringidos (casas con adeudo) */}
+        {morosos.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-lg font-bold text-red-700 mb-2">
+              Servicios restringidos{" "}
+              <span className="text-red-400 font-medium">({morosos.length})</span>
+            </h2>
+            <div className="bg-red-50 ring-1 ring-red-200 rounded-2xl p-3">
+              <p className="text-base text-red-700 mb-2">
+                Casas con adeudo — no permitir el ingreso de servicios extra (proveedores no esenciales).
+              </p>
+              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {morosos.map((m) => (
+                  <li
+                    key={m.id}
+                    className="bg-white rounded-xl p-2.5 ring-1 ring-red-100 flex items-center justify-between gap-2"
+                  >
+                    <span className="text-base font-semibold text-slate-800 truncate">
+                      Casa {m.numero}
+                      {m.propietario ? ` · ${m.propietario}` : ""}
+                    </span>
+                    <span className="text-base font-bold text-red-600 shrink-0">
+                      ${Number(m.saldo).toLocaleString("es-MX")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
 
         {/* Servicios recurrentes (domésticos) */}
         <section className="mt-6">
@@ -952,6 +1171,45 @@ export default function VigilanciaPage() {
           )}
         </section>
       </div>
+
+      {conoFor && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-5"
+          onClick={() => setConoFor(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-5 w-full max-w-sm flex flex-col gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-slate-800">Asignar cono</h3>
+            <p className="text-base text-slate-500">
+              Número o color del cono entregado al vehículo (se guarda solo en esta tablet).
+            </p>
+            <input
+              value={conoVal}
+              onChange={(e) => setConoVal(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && guardarCono()}
+              autoFocus
+              placeholder="Ej. 12 / rojo"
+              className="rounded-xl ring-1 ring-slate-200 px-3 py-2.5 text-lg text-slate-800 outline-none focus:ring-2 focus:ring-brand-300"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={guardarCono}
+                className="flex-1 rounded-xl bg-brand-500 text-white text-base font-semibold py-2.5 hover:bg-brand-600"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={quitarCono}
+                className="rounded-xl bg-slate-100 text-slate-600 text-base font-semibold px-4 py-2.5 hover:bg-slate-200"
+              >
+                Quitar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
