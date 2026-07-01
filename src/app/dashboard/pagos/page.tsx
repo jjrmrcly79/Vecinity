@@ -137,8 +137,9 @@ export default function PagosPage() {
       });
       if (error) throw new Error(error.message.replace(/^.*?:\s/, ""));
       // OCR del comprobante (best-effort): extrae la clave de rastreo para que el
-      // banco lo concilie solo. No bloquea ni falla el abono si el OCR no jala.
+      // banco lo concilie solo y para evitar que el mismo pago se registre 2 veces.
       const nuevoId = (abData as { id?: string } | null)?.id;
+      let duplicado = false;
       if (nuevoId && url) {
         try {
           const { data: sess } = await supabaseBrowser.auth.getSession();
@@ -147,18 +148,25 @@ export default function PagosPage() {
             const oc = await leerComprobante(token, url);
             if (oc.ok) {
               const ref = oc.data.clave_rastreo || oc.data.folio || null;
-              await supabaseBrowser.rpc("set_abono_ocr", {
+              const { data: sr } = await supabaseBrowser.rpc("set_abono_ocr", {
                 p_id: nuevoId,
                 p_ocr: oc.data,
                 p_ref: ref,
               });
+              if ((sr as { duplicado?: boolean } | null)?.duplicado) duplicado = true;
             }
           }
         } catch {
           /* el OCR es opcional; el abono ya quedó registrado */
         }
       }
-      setOk("Abono enviado. El comité lo revisará.");
+      if (duplicado) {
+        setErr(
+          "Esta transferencia ya había sido registrada antes (misma clave de rastreo). No se duplicó tu pago."
+        );
+      } else {
+        setOk("Abono enviado. El comité lo revisará.");
+      }
       setMonto("");
       setFile(null);
       if (houseId) await cargarMovs(houseId);
