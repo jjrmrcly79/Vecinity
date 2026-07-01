@@ -439,7 +439,21 @@ Segunda función de paridad (3957 visitantes reales en el legacy). Esta fase = l
 Pendiente que ejecuta el Director: push a GitHub + crear app en EasyPanel (Build Args + Env, dominio
 `vecinity.nexiasoluciones.com.mx`). Secretos solo en `.env.local` (gitignored): SERVICE_ROLE_KEY, TELEGRAM_BOT_TOKEN.
 
+## Sesión 2026-07-01 — vigilancia UX, estado de cuenta, SOS, QR, branding ✅
+Todo desplegado en `main` (auto-deploy EasyPanel). Sin pendientes abiertos de esta sesión.
+- **Vigilancia responsive + accesible**: layout de tablet (stack vertical + tarjetas en grid, ya no masonry), texto grande para guardias mayores, botón "Salir", **cámara forzada** (`capture="environment"`) en fotos. Secciones ahora son **bloques tipo tarjeta** (panel gris `bg-slate-100/70`) y "Registrar visita en caseta" es **bloque independiente arriba** (lo más usado; se quitó el toggle `mvOpen`).
+- **Auto-refresco del tablero** cada 25s SIN recargar página (React conserva formularios) y **se pausa mientras el guardia captura** algo (`editandoRef`). Resuelve el bug viejo de "se actualizaba y perdían lo que escribían".
+- **Escáner de pase QR en la app** (`html5-qrcode`): botón en vigilancia → cámara → extrae token de la URL → busca `visitors.token_acceso` → tarjeta con captura de foto INE/placas + `marcar_entrada_visita`. Reusa RPCs, sin cambios BD. (El QR solo codifica la URL `/visita/<token>`.)
+- **SOS / botón de pánico** endurecido: residente = mantener-presionado 2.5s + geolocalización + manejo de error real. Guardia = **banner rojo de SOS activos en vivo** (realtime + sondeo 20s) con Atender/Cerrar. Backend: `notify_sos` ahora also notifica rol `guardia`; RPCs `atender_sos`/`cerrar_sos`; realtime en `sos_events`. ⚠️ Solo 1 persona tiene `telegram_chat_id` — falta que comité/guardias liguen Telegram.
+- **Estado de cuenta por casa** (`/dashboard/estado-cuenta`, admin/comité): reemplaza el flujo inseguro de "entrar con la contraseña del vecino". Busca casa → desglose de `transactions` (cargos/abonos + estado + saldo corriente), resalta pendientes/rechazados, aprobar/rechazar inline. Movimientos más recientes primero.
+- **Evidencias de incidencias (404)**: eran rutas relativas legacy de Django; subí las 196 imágenes de `proyecto-condominio/media/evidencias/` a Storage `vecino-evidencias` y reescribí URLs a completas (22 sin evidencia → NULL). Ver memoria `vecinity-legacy-media-migration`.
+- **Datos**: corregidos conceptos mal rotulados sistémicos ("Mantenimiento Mensual - April 2026" del 30-abr → Mayo; April→Abril; June→Junio) e insertados pagos manuales de Casa 178 (Mayo $850 + Junio $750, idempotentes por `banco_hash`, replicando `resolver_transaccion`). Tope morosos: saldo > $1000 excluyendo `en_convenio`.
+- **Ícono de app de marca**: emblema Vecinity (escudo+casa+pulso) → `icon.svg` + `apple-icon.png` + PWA `manifest.ts` + `icon-192/512.png` (generados con `sharp`). Se quitó el `favicon.ico` de plantilla.
+
 ## Pendientes (siguiente fase, post-deploy)
+- [ ] **Que comité y guardias liguen su `telegram_chat_id`** — sin esto el SOS por Telegram solo llega a 1 persona (el banner en pantalla del guardia sí jala sin Telegram).
+- [ ] Ligar recibos históricos de `media/comprobantes_transacciones/` (~392) a sus transacciones (falta mapeo del sistema viejo).
+- [ ] Botón "Registrar pago" en Estado de cuenta (admin captura pago de una casa sin depender de inserts manuales).
 - [ ] Vista del vigilante + OCR de placas con **modelo de visión (Claude)** — NO Tesseract (probado: falla en placas reales). Limpiar 36/285 placas placeholder.
 - [ ] Caty + reglamento (RAG): ingestar `Reglamento_Consolidado_Villa_Catania_2026.docx` (~48k chars) + Q&A en el bot.
 - [ ] Índice de salud comunitaria (Presión vs. Resiliencia)
