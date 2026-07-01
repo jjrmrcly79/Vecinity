@@ -87,6 +87,8 @@ export default function ConciliacionPage() {
   const [resumen, setResumen] = useState<string | null>(null);
   const [autoBusy, setAutoBusy] = useState(false);
   const [autoResumen, setAutoResumen] = useState<string | null>(null);
+  // Corte: solo procesar movimientos DESDE esta fecha (evita re-contar lo histórico ya migrado).
+  const [desde, setDesde] = useState("2026-07-01");
 
   const cargarMapas = useCallback(async () => {
     const { data: hs } = await supabaseBrowser.from("houses").select("id, numero");
@@ -171,6 +173,7 @@ export default function ConciliacionPage() {
 
       const casasSet = new Set(Object.keys(casas));
       const out: Ingreso[] = [];
+      let saltadasPorFecha = 0;
       for (let i = hi + 1; i < rows.length; i++) {
         const r = rows[i] as unknown[];
         if (!r || r.length === 0) continue;
@@ -178,6 +181,11 @@ export default function ConciliacionPage() {
         if (monto <= 0) continue; // solo ingresos
         const concepto = String(r[iConcepto] ?? "").trim();
         const fecha = fmtFecha(r[iFecha]);
+        // Corte: ignora movimientos anteriores a "desde" (histórico ya migrado)
+        if (desde && fecha && fecha < desde) {
+          saltadasPorFecha++;
+          continue;
+        }
         const saldo = iSaldo >= 0 ? toNum(r[iSaldo]) : 0;
         const refKey = normRef(concepto);
         const hash = await sha256(`${fecha}|${monto}|${concepto}|${saldo}`);
@@ -201,13 +209,18 @@ export default function ConciliacionPage() {
         });
       }
       if (out.length === 0) {
-        setFileMsg("No encontré ingresos (abonos) en el archivo.");
+        setFileMsg(
+          saltadasPorFecha > 0
+            ? `No hay ingresos desde ${desde} (${saltadasPorFecha} anteriores ignorados por el corte).`
+            : "No encontré ingresos (abonos) en el archivo."
+        );
         return;
       }
       setIngresos(out);
       const nuevos = out.filter((o) => !o.dup).length;
       const conSug = out.filter((o) => o.sugerida && !o.dup).length;
-      setFileMsg(`${out.length} ingresos · ${nuevos} nuevos · ${conSug} con casa sugerida · ${out.length - nuevos} ya importados.`);
+      const corte = saltadasPorFecha > 0 ? ` · ${saltadasPorFecha} anteriores a ${desde} ignorados` : "";
+      setFileMsg(`${out.length} ingresos · ${nuevos} nuevos · ${conSug} con casa sugerida · ${out.length - nuevos} ya importados${corte}.`);
     } catch (e) {
       setFileMsg("No pude leer el archivo. ¿Es el Excel del banco?");
       console.error(e);
@@ -360,6 +373,18 @@ export default function ConciliacionPage() {
               onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
               className="mt-2 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:px-3 file:py-2 file:font-semibold"
             />
+          </label>
+          <label className="mt-3 block text-xs text-slate-500">
+            Procesar solo movimientos desde
+            <input
+              type="date"
+              value={desde}
+              onChange={(e) => setDesde(e.target.value)}
+              className="mt-1 w-full rounded-lg ring-1 ring-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-300"
+            />
+            <span className="block mt-1 text-[11px] text-slate-400">
+              Ignora lo anterior (ya está en el sistema por la migración). Evita doble conteo.
+            </span>
           </label>
           {fileMsg && <p className="text-xs text-slate-600 mt-2">{fileMsg}</p>}
         </section>
