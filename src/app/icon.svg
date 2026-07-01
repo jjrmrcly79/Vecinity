@@ -1,0 +1,20 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vecinity">
+  <defs>
+    <linearGradient id="vShield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="0.55" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#ffffff"/>
+  <g transform="translate(64,60) scale(4)">
+    <!-- Escudo (seguridad) -->
+    <path d="M48 2 L90 16 V52 C90 76 72 90 48 96 C24 90 6 76 6 52 V16 Z" fill="url(#vShield)"/>
+    <!-- Casa (comunidad) -->
+    <path d="M48 30 L72 49 H64 V70 H32 V49 H24 Z" fill="#ffffff"/>
+    <!-- Puerta -->
+    <rect x="43" y="54" width="10" height="16" rx="1.5" fill="#10b981"/>
+    <!-- Pulso / latido de comunidad -->
+    <path d="M18 80 H36 L41 71 L49 88 L55 80 H78" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95"/>
+  </g>
+</svg>
