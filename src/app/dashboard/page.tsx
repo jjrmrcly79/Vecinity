@@ -92,14 +92,18 @@ export default function Dashboard() {
           .maybeSingle();
         setHouse(h as unknown as House | null);
       }
-      if (p.role === "admin" || p.role === "comite") await loadPending();
-      // comunicados dirigidos a mi casa sin leer
-      const { count } = await supabaseBrowser
-        .from("comunicados")
-        .select("id", { count: "exact", head: true })
-        .is("leido_at", null)
-        .not("house_id", "is", null);
-      setNoLeidos(count ?? 0);
+      const esAdmin = p.role === "admin" || p.role === "comite";
+      if (esAdmin) await loadPending();
+      // Badge de no leídos: solo para el residente (sus comunicados dirigidos).
+      // El comité redacta, no recibe, así que no le mostramos conteo.
+      if (!esAdmin && p.house_id) {
+        const { count } = await supabaseBrowser
+          .from("comunicados")
+          .select("id", { count: "exact", head: true })
+          .is("leido_at", null)
+          .eq("house_id", p.house_id);
+        setNoLeidos(count ?? 0);
+      }
       setReady(true);
     })();
   }, [router, loadPending]);
