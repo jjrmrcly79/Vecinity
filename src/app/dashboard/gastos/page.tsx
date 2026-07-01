@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { runOrError } from "@/lib/rpc";
 
 type Gasto = {
   id: string;
@@ -58,6 +59,8 @@ export default function GastosPage() {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [listMsg, setListMsg] = useState<string | null>(null);
+  const [borrando, setBorrando] = useState<Set<string>>(new Set());
 
   const cargarGastos = useCallback(async () => {
     const { data } = await supabaseBrowser
@@ -111,6 +114,10 @@ export default function GastosPage() {
     if (!coloniaId) return setMsg("Sin colonia.");
     setBusy(true);
     const url = archivo ? await subirArchivo(archivo) : null;
+    if (archivo && !url) {
+      setBusy(false);
+      return setMsg("No se pudo subir el comprobante. Revisa tu conexión e intenta de nuevo.");
+    }
     const { error } = await supabaseBrowser.from("colonia_expenses").insert({
       colonia_id: coloniaId,
       concepto: concepto.trim(),
@@ -133,7 +140,19 @@ export default function GastosPage() {
   }
 
   async function eliminar(id: string) {
-    await supabaseBrowser.from("colonia_expenses").delete().eq("id", id);
+    if (borrando.has(id)) return;
+    if (!confirm("¿Eliminar este gasto? Esta acción no se puede deshacer.")) return;
+    setListMsg(null);
+    setBorrando((s) => new Set(s).add(id));
+    const res = await runOrError(() =>
+      supabaseBrowser.from("colonia_expenses").delete().eq("id", id)
+    );
+    setBorrando((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    if (!res.ok) return setListMsg(res.error);
     await cargarGastos();
   }
 
@@ -295,6 +314,11 @@ export default function GastosPage() {
           <h2 className="text-sm font-bold text-slate-700 mb-2">
             Movimientos <span className="text-slate-400 font-medium">({gastos.length})</span>
           </h2>
+          {listMsg && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+              {listMsg}
+            </p>
+          )}
           {gastos.length === 0 ? (
             <p className="text-slate-400 text-sm bg-white rounded-2xl p-4 ring-1 ring-slate-100">
               Aún no hay gastos registrados.
@@ -328,7 +352,8 @@ export default function GastosPage() {
                     <span className="font-bold text-slate-700">{money(Number(g.monto))}</span>
                     <button
                       onClick={() => eliminar(g.id)}
-                      className="text-slate-300 hover:text-red-500 text-lg leading-none"
+                      disabled={borrando.has(g.id)}
+                      className="text-slate-300 hover:text-red-500 text-lg leading-none disabled:opacity-40 px-1"
                       title="Eliminar"
                     >
                       ×

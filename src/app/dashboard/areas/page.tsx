@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { runOrError } from "@/lib/rpc";
 
 type Area = {
   id: string;
@@ -60,6 +61,10 @@ export default function AreasAdminPage() {
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [nuevoNombre, setNuevoNombre] = useState("");
+  const [cfgErr, setCfgErr] = useState<string | null>(null);
+  const [areaMsg, setAreaMsg] = useState<string | null>(null);
+  const [pendErr, setPendErr] = useState<string | null>(null);
+  const [resolviendo, setResolviendo] = useState<Set<string>>(new Set());
 
   const cargarAreas = useCallback(async () => {
     const { data } = await supabaseBrowser
@@ -114,43 +119,78 @@ export default function AreasAdminPage() {
   }, [router, cargarAreas, cargarPendientes]);
 
   async function guardar(a: Area) {
+    setAreaMsg(null);
     const { id, colonia_id: _c, ...campos } = a;
     void _c;
-    await supabaseBrowser.from("common_areas").update(campos).eq("id", id);
+    const res = await runOrError(() =>
+      supabaseBrowser.from("common_areas").update(campos).eq("id", id)
+    );
+    if (!res.ok) return setAreaMsg(res.error);
     setEditId(null);
     await cargarAreas();
   }
 
   async function crearArea() {
     if (!nuevoNombre.trim() || !coloniaId) return;
-    await supabaseBrowser.from("common_areas").insert({
-      colonia_id: coloniaId,
-      nombre: nuevoNombre.trim(),
-      reservable: true,
-      activa: true,
-      orden: areas.length + 1,
-    });
+    setAreaMsg(null);
+    const res = await runOrError(() =>
+      supabaseBrowser.from("common_areas").insert({
+        colonia_id: coloniaId,
+        nombre: nuevoNombre.trim(),
+        reservable: true,
+        activa: true,
+        orden: areas.length + 1,
+      })
+    );
+    if (!res.ok) return setAreaMsg(res.error);
     setNuevoNombre("");
     await cargarAreas();
   }
 
   async function guardarUmbral() {
     if (!coloniaId) return;
-    await supabaseBrowser.from("colonias").update({ umbral_reserva: umbral }).eq("id", coloniaId);
+    setCfgErr(null);
+    const res = await runOrError(() =>
+      supabaseBrowser.from("colonias").update({ umbral_reserva: umbral }).eq("id", coloniaId)
+    );
+    if (!res.ok) return setCfgErr(res.error);
     setUmbralGuardado(true);
     setTimeout(() => setUmbralGuardado(false), 2500);
   }
 
   async function guardarTope() {
     if (!coloniaId) return;
-    await supabaseBrowser.from("colonias").update({ tope_multa: tope }).eq("id", coloniaId);
+    setCfgErr(null);
+    const res = await runOrError(() =>
+      supabaseBrowser.from("colonias").update({ tope_multa: tope }).eq("id", coloniaId)
+    );
+    if (!res.ok) return setCfgErr(res.error);
     setTopeGuardado(true);
     setTimeout(() => setTopeGuardado(false), 2500);
   }
 
   async function resolverReserva(id: string, estado: "aprobada" | "rechazada") {
-    await supabaseBrowser.from("reservations").update({ estado }).eq("id", id);
+    if (resolviendo.has(id)) return; // evita doble-tap
+    setPendErr(null);
+    setResolviendo((s) => new Set(s).add(id));
+    const res = await runOrError(() =>
+      supabaseBrowser.from("reservations").update({ estado }).eq("id", id)
+    );
+    if (!res.ok) {
+      setPendErr(res.error);
+      setResolviendo((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+      return; // NO se remueve: la reserva sigue pendiente en la BD
+    }
     setPendientes((l) => l.filter((x) => x.id !== id));
+    setResolviendo((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
   }
 
   if (!ready)
@@ -199,6 +239,11 @@ export default function AreasAdminPage() {
                 {umbralGuardado ? "Guardado ✓" : "Guardar"}
               </button>
             </div>
+            {cfgErr && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mt-2">
+                {cfgErr}
+              </p>
+            )}
           </div>
         </section>
 
@@ -235,6 +280,11 @@ export default function AreasAdminPage() {
             Reservas por aprobar{" "}
             <span className="text-slate-400 font-medium">({pendientes.length})</span>
           </h2>
+          {pendErr && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+              {pendErr}
+            </p>
+          )}
           {pendientes.length === 0 ? (
             <p className="text-slate-400 text-sm bg-white rounded-2xl p-4 ring-1 ring-slate-100">
               No hay reservas pendientes 🎉
@@ -262,13 +312,15 @@ export default function AreasAdminPage() {
                   <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => resolverReserva(r.id, "aprobada")}
-                      className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600"
+                      disabled={resolviendo.has(r.id)}
+                      className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600 disabled:opacity-40"
                     >
-                      Aprobar
+                      {resolviendo.has(r.id) ? "…" : "Aprobar"}
                     </button>
                     <button
                       onClick={() => resolverReserva(r.id, "rechazada")}
-                      className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50"
+                      disabled={resolviendo.has(r.id)}
+                      className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50 disabled:opacity-40"
                     >
                       No
                     </button>
@@ -282,6 +334,11 @@ export default function AreasAdminPage() {
         {/* Lista de áreas */}
         <section className="mt-7">
           <h2 className="text-sm font-bold text-slate-700 mb-2">Áreas</h2>
+          {areaMsg && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+              {areaMsg}
+            </p>
+          )}
           <ul className="flex flex-col gap-2">
             {areas.map((a) => (
               <li key={a.id} className="bg-white rounded-2xl ring-1 ring-slate-100 overflow-hidden">

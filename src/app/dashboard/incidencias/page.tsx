@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { callRpc } from "@/lib/rpc";
 import { autoprocesarIncidencia } from "./actions";
 
 type Cat = { id: string; nombre: string; monto_base: number };
@@ -77,6 +78,8 @@ export default function IncidenciasPage() {
   const [pend, setPend] = useState<Reporte[]>([]);
   const [pendTotal, setPendTotal] = useState(0);
   const [propuestas, setPropuestas] = useState<Reporte[]>([]);
+  const [votando, setVotando] = useState<Set<string>>(new Set());
+  const [propErr, setPropErr] = useState<string | null>(null);
 
   const cargarMios = useCallback(async (hid: string) => {
     const { data } = await supabaseBrowser
@@ -143,7 +146,19 @@ export default function IncidenciasPage() {
   }, [router, cargarMios, cargarPend, cargarPropuestas]);
 
   async function votar(id: string, aprobar: boolean) {
-    await supabaseBrowser.rpc("votar_resolucion", { p_id: id, p_aprobar: aprobar });
+    if (votando.has(id)) return; // evita doble-tap
+    setPropErr(null);
+    setVotando((s) => new Set(s).add(id));
+    const res = await callRpc("votar_resolucion", { p_id: id, p_aprobar: aprobar });
+    setVotando((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    if (!res.ok) {
+      setPropErr(res.error);
+      return; // NO se remueve: la propuesta sigue pendiente en la BD
+    }
     setPropuestas((l) => l.filter((x) => x.id !== id));
   }
 
@@ -345,6 +360,11 @@ export default function IncidenciasPage() {
             <p className="text-xs text-slate-500 mb-2">
               Placa verificada por OCR (reincidencia). Da 1 voto para aplicar la multa.
             </p>
+            {propErr && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+                {propErr}
+              </p>
+            )}
             <ul className="flex flex-col gap-2">
               {propuestas.map((r) => (
                 <li key={r.id} className="bg-white rounded-2xl p-3.5 ring-1 ring-purple-100">
@@ -362,13 +382,15 @@ export default function IncidenciasPage() {
                   <div className="flex gap-2 mt-2.5">
                     <button
                       onClick={() => votar(r.id, true)}
-                      className="flex-1 rounded-xl bg-red-500 text-white text-sm font-semibold px-3 py-2 hover:bg-red-600"
+                      disabled={votando.has(r.id)}
+                      className="flex-1 rounded-xl bg-red-500 text-white text-sm font-semibold px-3 py-2 hover:bg-red-600 disabled:opacity-40"
                     >
-                      Aprobar (1 voto) → multar
+                      {votando.has(r.id) ? "…" : "Aprobar (1 voto) → multar"}
                     </button>
                     <button
                       onClick={() => votar(r.id, false)}
-                      className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50"
+                      disabled={votando.has(r.id)}
+                      className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50 disabled:opacity-40"
                     >
                       Rechazar
                     </button>
@@ -452,6 +474,7 @@ function ResolverItem({ r, onDone }: { r: Reporte; onDone: (id: string) => void 
   const [placas, setPlacas] = useState<string[]>([]);
   const [reinc, setReinc] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [itemErr, setItemErr] = useState<string | null>(null);
 
   async function cargarContexto() {
     // placas del infractor + sugerencia por reincidencia (vía RPC con ids reales)
@@ -484,13 +507,28 @@ function ResolverItem({ r, onDone }: { r: Reporte; onDone: (id: string) => void 
   }, []);
 
   async function resolver(accion: "multar" | "rechazar") {
+    if (busy) return; // evita doble-tap
+    setItemErr(null);
+    let p_monto: number | null = null;
+    if (accion === "multar") {
+      p_monto = parseFloat(monto);
+      if (!Number.isFinite(p_monto) || p_monto <= 0) {
+        setItemErr("Escribe un monto válido mayor a 0.");
+        return;
+      }
+    }
     setBusy(true);
-    await supabaseBrowser.rpc("resolver_incidencia", {
+    const res = await callRpc("resolver_incidencia", {
       p_id: r.id,
       p_accion: accion,
-      p_monto: accion === "multar" ? parseFloat(monto) : null,
+      p_monto,
       p_nota: nota.trim() || null,
     });
+    setBusy(false);
+    if (!res.ok) {
+      setItemErr(res.error); // NO se remueve: sigue pendiente en la BD
+      return;
+    }
     onDone(r.id);
   }
 
@@ -561,6 +599,11 @@ function ResolverItem({ r, onDone }: { r: Reporte; onDone: (id: string) => void 
           Rechazar
         </button>
       </div>
+      {itemErr && (
+        <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mt-2">
+          {itemErr}
+        </p>
+      )}
     </li>
   );
 }

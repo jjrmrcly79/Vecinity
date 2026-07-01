@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { callRpc, runOrError } from "@/lib/rpc";
 
 type Cat = { id: string; nombre: string };
 type Vehiculo = {
@@ -42,6 +43,8 @@ export default function VehiculosPage() {
 
   const [mios, setMios] = useState<Vehiculo[]>([]);
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
+  const [resolviendo, setResolviendo] = useState<Set<string>>(new Set());
+  const [pendErr, setPendErr] = useState<string | null>(null);
 
   const cargarMios = useCallback(async (hid: string) => {
     const { data } = await supabaseBrowser
@@ -111,14 +114,14 @@ export default function VehiculosPage() {
     setErr(null);
     if (!placa.trim()) return setErr("Escribe la placa.");
     setEnviando(true);
-    const { error } = await supabaseBrowser.rpc("agregar_vehiculo", {
+    const res = await callRpc("agregar_vehiculo", {
       p_placa: placa.trim(),
       p_brand_id: brandId || null,
       p_model_id: modelId || null,
       p_color: color.trim() || null,
     });
     setEnviando(false);
-    if (error) return setErr(error.message.replace(/^.*?:\s/, ""));
+    if (!res.ok) return setErr(res.error);
     setPlaca("");
     setColor("");
     setBrandId("");
@@ -128,16 +131,46 @@ export default function VehiculosPage() {
   }
 
   async function eliminar(id: string) {
-    const { error } = await supabaseBrowser.rpc("eliminar_vehiculo", { p_id: id });
-    if (!error && houseId) await cargarMios(houseId);
+    if (resolviendo.has(id)) return;
+    setPendErr(null);
+    setResolviendo((s) => new Set(s).add(id));
+    const res = await runOrError(() =>
+      supabaseBrowser.rpc("eliminar_vehiculo", { p_id: id })
+    );
+    setResolviendo((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    if (!res.ok) return setPendErr(res.error);
+    if (houseId) await cargarMios(houseId);
   }
 
   async function resolver(id: string, estado: "aprobado" | "rechazado", rfid?: string) {
-    await supabaseBrowser
-      .from("vehicles")
-      .update({ estado, tarjeta_rfid: rfid?.trim() || null })
-      .eq("id", id);
+    if (resolviendo.has(id)) return; // evita doble-tap
+    setPendErr(null);
+    setResolviendo((s) => new Set(s).add(id));
+    const res = await runOrError(() =>
+      supabaseBrowser
+        .from("vehicles")
+        .update({ estado, tarjeta_rfid: rfid?.trim() || null })
+        .eq("id", id)
+    );
+    if (!res.ok) {
+      setPendErr(res.error);
+      setResolviendo((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+      return; // NO se remueve: el vehículo sigue pendiente en la BD
+    }
     setPendientes((l) => l.filter((x) => x.id !== id));
+    setResolviendo((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
     if (houseId) await cargarMios(houseId);
   }
 
@@ -285,6 +318,11 @@ export default function VehiculosPage() {
               Vehículos por aprobar{" "}
               <span className="text-slate-400 font-medium">({pendientes.length})</span>
             </h2>
+            {pendErr && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+                {pendErr}
+              </p>
+            )}
             {pendientes.length === 0 ? (
               <p className="text-slate-400 text-sm bg-white rounded-2xl p-4 ring-1 ring-slate-100">
                 No hay vehículos pendientes 🎉
@@ -292,7 +330,7 @@ export default function VehiculosPage() {
             ) : (
               <ul className="flex flex-col gap-2">
                 {pendientes.map((v) => (
-                  <AprobarVehiculo key={v.id} v={v} onResolve={resolver} />
+                  <AprobarVehiculo key={v.id} v={v} onResolve={resolver} busy={resolviendo.has(v.id)} />
                 ))}
               </ul>
             )}
@@ -306,9 +344,11 @@ export default function VehiculosPage() {
 function AprobarVehiculo({
   v,
   onResolve,
+  busy,
 }: {
   v: Pendiente;
   onResolve: (id: string, estado: "aprobado" | "rechazado", rfid?: string) => void;
+  busy: boolean;
 }) {
   const [rfid, setRfid] = useState("");
   return (
@@ -333,13 +373,15 @@ function AprobarVehiculo({
         />
         <button
           onClick={() => onResolve(v.id, "aprobado", rfid)}
-          className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600"
+          disabled={busy}
+          className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600 disabled:opacity-40"
         >
-          Aprobar
+          {busy ? "…" : "Aprobar"}
         </button>
         <button
           onClick={() => onResolve(v.id, "rechazado")}
-          className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50"
+          disabled={busy}
+          className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50 disabled:opacity-40"
         >
           No
         </button>

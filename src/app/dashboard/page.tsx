@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { runOrError } from "@/lib/rpc";
 
 type Profile = {
   id: string;
@@ -47,6 +48,8 @@ export default function Dashboard() {
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdStart = useRef(0);
   const [ready, setReady] = useState(false);
+  const [resolviendo, setResolviendo] = useState<Set<string>>(new Set());
+  const [pendErr, setPendErr] = useState<string | null>(null);
 
   const isAdmin = profile?.role === "admin" || profile?.role === "comite";
 
@@ -94,7 +97,11 @@ export default function Dashboard() {
   }, [router, loadPending]);
 
   const dispararSOS = useCallback(async () => {
-    if (!profile?.colonia_id) return;
+    // Sin colonia ligada no se puede enviar: mostrar error en vez de quedar colgado en "holding"
+    if (!profile?.colonia_id) {
+      setSosState("error");
+      return;
+    }
     setSosState("sending");
     const coords = await getCoords();
     const { error } = await supabaseBrowser.from("sos_events").insert({
@@ -146,10 +153,21 @@ export default function Dashboard() {
   useEffect(() => () => clearHold(), []);
 
   async function resolver(id: string, status: "aprobado" | "rechazado") {
-    await supabaseBrowser
-      .from("profiles")
-      .update({ approval_status: status })
-      .eq("id", id);
+    if (resolviendo.has(id)) return; // evita doble-tap
+    setPendErr(null);
+    setResolviendo((s) => new Set(s).add(id));
+    const res = await runOrError(() =>
+      supabaseBrowser.from("profiles").update({ approval_status: status }).eq("id", id)
+    );
+    setResolviendo((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    if (!res.ok) {
+      setPendErr(res.error);
+      return; // NO se remueve: la solicitud sigue pendiente en la BD
+    }
     setPending((list) => list.filter((x) => x.id !== id));
   }
 
@@ -314,6 +332,11 @@ export default function Dashboard() {
               Solicitudes pendientes{" "}
               <span className="text-slate-400 font-medium">({pending.length})</span>
             </h2>
+            {pendErr && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+                {pendErr}
+              </p>
+            )}
             {pending.length === 0 ? (
               <p className="text-slate-400 text-sm bg-white rounded-2xl p-4 ring-1 ring-slate-100">
                 No hay solicitudes por revisar 🎉
@@ -332,13 +355,15 @@ export default function Dashboard() {
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => resolver(u.id, "aprobado")}
-                        className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600"
+                        disabled={resolviendo.has(u.id)}
+                        className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600 disabled:opacity-40"
                       >
-                        Aprobar
+                        {resolviendo.has(u.id) ? "…" : "Aprobar"}
                       </button>
                       <button
                         onClick={() => resolver(u.id, "rechazado")}
-                        className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50"
+                        disabled={resolviendo.has(u.id)}
+                        className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50 disabled:opacity-40"
                       >
                         No
                       </button>

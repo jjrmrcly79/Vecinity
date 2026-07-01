@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { callRpc } from "@/lib/rpc";
 
 type Mov = {
   id: string;
@@ -38,6 +39,8 @@ export default function EstadoCuentaPage() {
   const [movs, setMovs] = useState<Mov[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [buscando, setBuscando] = useState(false);
+  const [resolviendo, setResolviendo] = useState<Set<string>>(new Set());
+  const [pendErr, setPendErr] = useState<string | null>(null);
 
   // Solo admin/comité
   useEffect(() => {
@@ -98,7 +101,16 @@ export default function EstadoCuentaPage() {
   }
 
   async function resolver(id: string, aprobar: boolean) {
-    await supabaseBrowser.rpc("resolver_transaccion", { p_id: id, p_aprobar: aprobar });
+    if (resolviendo.has(id)) return; // evita doble-tap
+    setPendErr(null);
+    setResolviendo((s) => new Set(s).add(id));
+    const res = await callRpc("resolver_transaccion", { p_id: id, p_aprobar: aprobar });
+    setResolviendo((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    if (!res.ok) return setPendErr(res.error); // la transacción sigue pendiente en la BD
     if (casa) await cargarCasa(casa.id);
   }
 
@@ -228,6 +240,11 @@ export default function EstadoCuentaPage() {
               <h2 className="text-sm font-bold text-slate-700 mb-2">
                 Movimientos <span className="text-slate-400 font-medium">({movs.length})</span>
               </h2>
+              {pendErr && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+                  {pendErr}
+                </p>
+              )}
               {movs.length === 0 ? (
                 <p className="text-slate-400 text-sm bg-white rounded-2xl p-4 ring-1 ring-slate-100">
                   Sin movimientos.
@@ -290,13 +307,15 @@ export default function EstadoCuentaPage() {
                             <div className="flex gap-2 mt-2">
                               <button
                                 onClick={() => resolver(m.id, true)}
-                                className="rounded-lg bg-brand-500 text-white text-xs font-semibold px-3 py-1.5 hover:bg-brand-600"
+                                disabled={resolviendo.has(m.id)}
+                                className="rounded-lg bg-brand-500 text-white text-xs font-semibold px-3 py-1.5 hover:bg-brand-600 disabled:opacity-40"
                               >
-                                Aprobar
+                                {resolviendo.has(m.id) ? "…" : "Aprobar"}
                               </button>
                               <button
                                 onClick={() => resolver(m.id, false)}
-                                className="rounded-lg border border-slate-200 text-slate-500 text-xs font-semibold px-3 py-1.5 hover:bg-slate-50"
+                                disabled={resolviendo.has(m.id)}
+                                className="rounded-lg border border-slate-200 text-slate-500 text-xs font-semibold px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40"
                               >
                                 Rechazar
                               </button>

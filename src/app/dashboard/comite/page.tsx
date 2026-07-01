@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { callRpc } from "@/lib/rpc";
 
 const money = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -50,6 +51,9 @@ export default function PanelComite() {
   const [cvNota, setCvNota] = useState("");
   const [cvMsg, setCvMsg] = useState<string | null>(null);
   const [showCv, setShowCv] = useState(false);
+  const [cvBusy, setCvBusy] = useState(false);
+  const [convMsg, setConvMsg] = useState<string | null>(null);
+  const [cerrando, setCerrando] = useState<Set<string>>(new Set());
 
   const cargarFinanzas = useCallback(async () => {
     const [abonos, vehiculos, incidencias, vecinos] = await Promise.all([
@@ -131,31 +135,48 @@ export default function PanelComite() {
   }
 
   async function crearConvenio() {
+    if (cvBusy) return; // evita doble-tap
     setCvMsg(null);
     if (!cvCasa.trim() || !cvSemanal.trim()) return setCvMsg("Casa y monto semanal son obligatorios.");
-    const { data: h } = await supabaseBrowser
-      .from("houses")
-      .select("id")
-      .eq("numero", cvCasa.trim())
-      .maybeSingle();
-    const house = h as unknown as { id: string } | null;
-    if (!house) return setCvMsg(`No encontré la casa ${cvCasa}.`);
-    const { error } = await supabaseBrowser.rpc("crear_convenio", {
-      p_house_id: house.id,
-      p_monto_semanal: parseFloat(cvSemanal),
-      p_monto_acordado: null,
-      p_nota: cvNota.trim() || null,
-    });
-    if (error) return setCvMsg(error.message.replace(/^.*?:\s/, ""));
-    setCvCasa("");
-    setCvSemanal("");
-    setCvNota("");
-    setShowCv(false);
-    await Promise.all([cargarConvenios(), cargarFinanzas()]);
+    const semanal = parseFloat(cvSemanal);
+    if (!Number.isFinite(semanal) || semanal <= 0) return setCvMsg("El monto semanal debe ser mayor a 0.");
+    setCvBusy(true);
+    try {
+      const { data: h } = await supabaseBrowser
+        .from("houses")
+        .select("id")
+        .eq("numero", cvCasa.trim())
+        .maybeSingle();
+      const house = h as unknown as { id: string } | null;
+      if (!house) return setCvMsg(`No encontré la casa ${cvCasa}.`);
+      const res = await callRpc("crear_convenio", {
+        p_house_id: house.id,
+        p_monto_semanal: semanal,
+        p_monto_acordado: null,
+        p_nota: cvNota.trim() || null,
+      });
+      if (!res.ok) return setCvMsg(res.error);
+      setCvCasa("");
+      setCvSemanal("");
+      setCvNota("");
+      setShowCv(false);
+      await Promise.all([cargarConvenios(), cargarFinanzas()]);
+    } finally {
+      setCvBusy(false);
+    }
   }
 
   async function cerrarConvenio(id: string) {
-    await supabaseBrowser.rpc("cerrar_convenio", { p_id: id });
+    if (cerrando.has(id)) return; // evita doble-tap
+    setConvMsg(null);
+    setCerrando((s) => new Set(s).add(id));
+    const res = await callRpc("cerrar_convenio", { p_id: id });
+    setCerrando((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    if (!res.ok) return setConvMsg(res.error);
     await Promise.all([cargarConvenios(), cargarFinanzas()]);
   }
 
@@ -339,13 +360,19 @@ export default function PanelComite() {
               {cvMsg && <p className="text-xs text-red-600">{cvMsg}</p>}
               <button
                 onClick={crearConvenio}
-                className="rounded-xl bg-brand-500 text-white text-sm font-semibold py-2 hover:bg-brand-600"
+                disabled={cvBusy}
+                className="rounded-xl bg-brand-500 text-white text-sm font-semibold py-2 hover:bg-brand-600 disabled:opacity-40"
               >
-                Crear convenio
+                {cvBusy ? "Creando…" : "Crear convenio"}
               </button>
             </div>
           )}
 
+          {convMsg && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+              {convMsg}
+            </p>
+          )}
           {convenios.length === 0 ? (
             <p className="text-slate-400 text-sm bg-white rounded-2xl p-4 ring-1 ring-slate-100">
               Sin convenios activos.
@@ -383,9 +410,10 @@ export default function PanelComite() {
                     </div>
                     <button
                       onClick={() => cerrarConvenio(c.plan_id)}
-                      className="mt-2 text-xs text-slate-400 hover:text-slate-600"
+                      disabled={cerrando.has(c.plan_id)}
+                      className="mt-2 text-xs text-slate-400 hover:text-slate-600 disabled:opacity-40"
                     >
-                      Cerrar convenio
+                      {cerrando.has(c.plan_id) ? "Cerrando…" : "Cerrar convenio"}
                     </button>
                   </li>
                 );

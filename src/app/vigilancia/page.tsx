@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Html5Qrcode as Html5QrcodeType } from "html5-qrcode";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { callRpc } from "@/lib/rpc";
 import { leerPlaca } from "./actions";
 
 type Visita = {
@@ -264,12 +265,22 @@ export default function VigilanciaPage() {
   }, []);
 
   async function atenderSos(id: string) {
-    await supabaseBrowser.rpc("atender_sos", { p_id: id });
+    const res = await callRpc("atender_sos", { p_id: id });
+    if (!res.ok) {
+      alert(res.error);
+      return;
+    }
     await cargarSos();
   }
 
   async function cerrarSos(id: string) {
-    await supabaseBrowser.rpc("cerrar_sos", { p_id: id });
+    // Cerrar apaga la alerta de pánico para toda la vigilancia: confirmar para evitar mistaps.
+    if (!confirm("¿Cerrar esta alerta de SOS? Se marcará como atendida y desaparecerá del tablero.")) return;
+    const res = await callRpc("cerrar_sos", { p_id: id });
+    if (!res.ok) {
+      alert(res.error);
+      return;
+    }
     await cargarSos();
   }
 
@@ -336,18 +347,32 @@ export default function VigilanciaPage() {
 
   async function entradaDesdeScan() {
     if (!scanVisit) return;
+    setScanMsg(null);
     setScanBusy(true);
     try {
       const ineUrl = scanIne ? await subirFoto(scanIne, "visitas") : null;
       const placaUrl = scanPlaca ? await subirFoto(scanPlaca, "visitas") : null;
+      // Si se eligió una foto pero no se pudo subir, no marcar la entrada sin evidencia.
+      if ((scanIne && !ineUrl) || (scanPlaca && !placaUrl)) {
+        setScanMsg("No se pudo subir la foto. Revisa la conexión e inténtalo de nuevo.");
+        return;
+      }
       if (ineUrl || placaUrl) {
-        await supabaseBrowser.rpc("adjuntar_fotos_visita", {
+        const adj = await callRpc("adjuntar_fotos_visita", {
           p_id: scanVisit.id,
           p_foto_ine_url: ineUrl,
           p_foto_placa_url: placaUrl,
         });
+        if (!adj.ok) {
+          setScanMsg(adj.error);
+          return;
+        }
       }
-      await supabaseBrowser.rpc("marcar_entrada_visita", { p_id: scanVisit.id });
+      const ent = await callRpc("marcar_entrada_visita", { p_id: scanVisit.id });
+      if (!ent.ok) {
+        setScanMsg(ent.error);
+        return; // no cerrar: la entrada NO se marcó
+      }
       await Promise.all([cargarVisitas(), cargarHistorial()]);
       cerrarScan();
     } finally {

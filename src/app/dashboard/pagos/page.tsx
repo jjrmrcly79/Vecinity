@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { callRpc } from "@/lib/rpc";
 
 type Mov = {
   id: string;
@@ -41,6 +42,8 @@ export default function PagosPage() {
 
   const [movs, setMovs] = useState<Mov[]>([]);
   const [pend, setPend] = useState<Pend[]>([]);
+  const [resolviendo, setResolviendo] = useState<Set<string>>(new Set());
+  const [pendErr, setPendErr] = useState<string | null>(null);
 
   const cargarSaldo = useCallback(async (hid: string) => {
     const { data } = await supabaseBrowser
@@ -144,12 +147,30 @@ export default function PagosPage() {
   }
 
   async function resolver(id: string, aprobar: boolean) {
-    await supabaseBrowser.rpc("resolver_transaccion", { p_id: id, p_aprobar: aprobar });
+    if (resolviendo.has(id)) return; // evita doble-tap
+    setPendErr(null);
+    setResolviendo((s) => new Set(s).add(id));
+    const res = await callRpc("resolver_transaccion", { p_id: id, p_aprobar: aprobar });
+    if (!res.ok) {
+      setPendErr(res.error);
+      setResolviendo((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+      return; // NO se remueve: la transacción sigue pendiente en la BD
+    }
     setPend((l) => l.filter((x) => x.id !== id));
+    setResolviendo((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
     if (houseId) {
       await cargarSaldo(houseId);
       await cargarMovs(houseId);
     }
+    if (isAdmin) await cargarPend();
   }
 
   if (!ready)
@@ -237,6 +258,11 @@ export default function PagosPage() {
             <h2 className="text-sm font-bold text-slate-700 mb-2">
               Abonos por aprobar <span className="text-slate-400 font-medium">({pend.length})</span>
             </h2>
+            {pendErr && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2 ring-1 ring-red-200 mb-2">
+                {pendErr}
+              </p>
+            )}
             {pend.length === 0 ? (
               <p className="text-slate-400 text-sm bg-white rounded-2xl p-4 ring-1 ring-slate-100">
                 No hay abonos pendientes 🎉
@@ -267,13 +293,15 @@ export default function PagosPage() {
                       <div className="flex gap-2 shrink-0">
                         <button
                           onClick={() => resolver(t.id, true)}
-                          className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600"
+                          disabled={resolviendo.has(t.id)}
+                          className="rounded-xl bg-brand-500 text-white text-sm font-semibold px-3 py-2 hover:bg-brand-600 disabled:opacity-40"
                         >
-                          Aprobar
+                          {resolviendo.has(t.id) ? "…" : "Aprobar"}
                         </button>
                         <button
                           onClick={() => resolver(t.id, false)}
-                          className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50"
+                          disabled={resolviendo.has(t.id)}
+                          className="rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold px-3 py-2 hover:bg-slate-50 disabled:opacity-40"
                         >
                           No
                         </button>
