@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { callRpc } from "@/lib/rpc";
+import { generarReciboAbono } from "../recibo-actions";
 
 type Mov = {
   id: string;
@@ -111,7 +112,26 @@ export default function EstadoCuentaPage() {
       return n;
     });
     if (!res.ok) return setPendErr(res.error); // la transacción sigue pendiente en la BD
+    if (aprobar) {
+      // Genera el recibo foliado del abono recién aprobado (best-effort).
+      const token = (await supabaseBrowser.auth.getSession()).data.session?.access_token ?? "";
+      generarReciboAbono(token, id).catch(() => {});
+    }
     if (casa) await cargarCasa(casa.id);
+  }
+
+  // Descarga el recibo foliado de un abono aprobado; lo genera si aún no existe.
+  async function descargarRecibo(m: Mov) {
+    if (m.recibo_pdf_url) {
+      window.open(m.recibo_pdf_url, "_blank", "noopener");
+      return;
+    }
+    setPendErr(null);
+    const token = (await supabaseBrowser.auth.getSession()).data.session?.access_token ?? "";
+    const res = await generarReciboAbono(token, m.id);
+    if (!res.ok) return setPendErr(res.error);
+    setMovs((l) => l.map((x) => (x.id === m.id ? { ...x, recibo_pdf_url: res.url } : x)));
+    window.open(res.url, "_blank", "noopener");
   }
 
   if (!ready)
@@ -292,15 +312,13 @@ export default function EstadoCuentaPage() {
                                 Comprobante
                               </a>
                             )}
-                            {m.recibo_pdf_url && (
-                              <a
-                                href={m.recibo_pdf_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-slate-500 font-semibold underline"
+                            {m.tipo === "abono" && m.estado === "aprobado" && (
+                              <button
+                                onClick={() => descargarRecibo(m)}
+                                className="text-xs text-brand-600 font-semibold underline"
                               >
-                                Recibo
-                              </a>
+                                {m.recibo_pdf_url ? "🧾 Recibo" : "🧾 Generar recibo"}
+                              </button>
                             )}
                           </div>
                           {esAbono && m.estado === "pendiente" && (

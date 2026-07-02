@@ -7,6 +7,29 @@
 > 🔎 **RETOMAR AQUÍ:** ver `REVISION_PENDIENTE.md` — paridad para lanzamiento (deploy ≠ cutover).
 > El review E2E del 2026-06-27 (abajo) verificó BD + 13 rutas contra producción: **~82% al lanzamiento**.
 
+## Recibo foliado de abonos (paridad Django) + backfill resoluciones (2026-07-02) ✅
+
+**Recibo de abonos:** el Django viejo generaba, al aprobar un abono, un **recibo PDF foliado**
+(folio consecutivo por colonia) descargable desde el estado de cuenta; a los vecinos les gusta bajarlos.
+El schema nuevo ya tenía `transactions.recibo_pdf_url` + `folio_counters` pero la generación nunca se portó.
+Restaurado:
+- **Migración 035**: `transactions.folio` (UNIQUE parcial por colonia), RPC `siguiente_folio` (upsert
+  atómico sobre `folio_counters`; Villa Catania seguía en **2381** → continúa desde 2382), RPC
+  `set_recibo_transaccion`, bucket Storage `vecino-recibos` (público, path `colonia/casa/recibo_N.pdf`).
+- **PDF con `pdf-lib`** (`src/lib/recibo-pdf.ts`, coordenadas — robusto en Next standalone/Docker, sin
+  gotcha de fuentes AFM de pdfkit) reproduciendo el recibo azul de Villa Catania: folio en rojo, tabla
+  DIA/MES/AÑO, datos bancarios (Bancomer/Clabe), concepto, **cantidad + cantidad con letra** (conversor
+  español propio, sin dep). E2E probado: folio 2382, subido a Storage, URL pública 200 application/pdf.
+- **Server Action** `generarReciboAbono` (`dashboard/recibo-actions.ts`): autz dueño-o-comité, idempotente
+  (no regenera si ya existe), asigna folio → arma PDF → sube → guarda `recibo_pdf_url`. Se dispara al
+  aprobar el abono (best-effort) y **lazy** al primer "Descargar recibo" (para los ~1,100 abonos históricos
+  no se pre-generan PDFs — se crean bajo demanda). Botón en `mi-cuenta` (residente) y `estado-cuenta` (comité).
+
+**Backfill de resoluciones (multas viejas):** `scripts/backfill_resoluciones.mjs` (idempotente,
+concurrencia 4). Generó **42/50**; las **8 restantes quedaron BLOQUEADAS por saldo de créditos Anthropic
+agotado** (la cuenta compartida se quedó sin crédito). Re-correr el script al recargar → toma solo las 8.
+⚠️ El mismo agotamiento afecta la generación EN VIVO de resoluciones nuevas hasta que se recarguen créditos.
+
 ## Resolución oficial de multas + anonimato del reportante (2026-07-02) ✅
 
 **Qué pidió Juan:** que el infractor pueda abrir la **resolución oficial** de su multa

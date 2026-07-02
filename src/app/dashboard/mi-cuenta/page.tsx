@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { callRpc } from "@/lib/rpc";
+import { generarReciboAbono } from "../recibo-actions";
 
 type Mov = {
   id: string;
@@ -55,6 +56,7 @@ const fechaHora = (iso: string | null) =>
 
 const MOV_COLS = "id, tipo, monto, concepto, estado, comprobante_url, recibo_pdf_url, created_at";
 const esMulta = (m: Mov) => m.tipo === "cargo" && /^multa\b/i.test(m.concepto);
+const esAbonoAprobado = (m: Mov) => m.tipo === "abono" && m.estado === "aprobado";
 
 export default function MiCuentaPage() {
   const router = useRouter();
@@ -64,6 +66,7 @@ export default function MiCuentaPage() {
   const [detalle, setDetalle] = useState<Resolucion | null>(null);
   const [cargandoDet, setCargandoDet] = useState<string | null>(null);
   const [detErr, setDetErr] = useState<string | null>(null);
+  const [recibo, setRecibo] = useState<string | null>(null); // id del abono generando
 
   useEffect(() => {
     (async () => {
@@ -112,6 +115,22 @@ export default function MiCuentaPage() {
     setCargandoDet(null);
     if (!res.ok) return setDetErr(res.error);
     setDetalle(res.data);
+  }
+
+  // Descarga el recibo foliado; si aún no existe, lo genera al vuelo.
+  async function descargarRecibo(m: Mov) {
+    if (m.recibo_pdf_url) {
+      window.open(m.recibo_pdf_url, "_blank", "noopener");
+      return;
+    }
+    setDetErr(null);
+    setRecibo(m.id);
+    const token = (await supabaseBrowser.auth.getSession()).data.session?.access_token ?? "";
+    const res = await generarReciboAbono(token, m.id);
+    setRecibo(null);
+    if (!res.ok) return setDetErr(res.error);
+    setMovs((l) => l.map((x) => (x.id === m.id ? { ...x, recibo_pdf_url: res.url } : x)));
+    window.open(res.url, "_blank", "noopener");
   }
 
   if (!ready)
@@ -204,6 +223,15 @@ export default function MiCuentaPage() {
                           className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-slate-700 text-white text-xs font-semibold px-3 py-1.5 hover:bg-slate-800 disabled:opacity-40"
                         >
                           {cargandoDet === m.id ? "Abriendo…" : "📄 Ver resolución"}
+                        </button>
+                      )}
+                      {esAbonoAprobado(m) && (
+                        <button
+                          onClick={() => descargarRecibo(m)}
+                          disabled={recibo === m.id}
+                          className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-brand-600 text-white text-xs font-semibold px-3 py-1.5 hover:bg-brand-700 disabled:opacity-40"
+                        >
+                          {recibo === m.id ? "Generando…" : "🧾 Descargar recibo"}
                         </button>
                       )}
                     </div>
