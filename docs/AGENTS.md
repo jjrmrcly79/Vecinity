@@ -26,9 +26,19 @@ Restaurado:
   no se pre-generan PDFs — se crean bajo demanda). Botón en `mi-cuenta` (residente) y `estado-cuenta` (comité).
 
 **Backfill de resoluciones (multas viejas):** `scripts/backfill_resoluciones.mjs` (idempotente,
-concurrencia 4). Generó **42/50**; las **8 restantes quedaron BLOQUEADAS por saldo de créditos Anthropic
-agotado** (la cuenta compartida se quedó sin crédito). Re-correr el script al recargar → toma solo las 8.
-⚠️ El mismo agotamiento afecta la generación EN VIVO de resoluciones nuevas hasta que se recarguen créditos.
+concurrencia 4). **Completado: 50/50** (se generaron 42, luego se agotó el saldo Anthropic; tras recargar
+créditos en la organización correcta de console.anthropic.com se corrieron las 8 restantes). Nota operativa:
+los créditos de API son **por organización** y NO se recargan en claude.ai (es otra plataforma).
+
+**Reconciliación multas↔cargos:** `scripts/reconciliar_multas.mjs` ligó 44 multas viejas a su cargo real
+(empate 1:1 casa+monto+categoría+fecha). 3 sin cargo se revisaron a mano: 128 era prueba (rechazada, no
+cobrada), 167 y 250 reales (cargo creado). La 167 luego se **condonó** (acuerdo con el residente): saldo en
+ceros, multa conservada como antecedente. La invariante `saldo = Σcargos − Σabonos` se mantiene (116/116).
+
+**Mejora futura — cruce reserva↔multa:** las reservas de amenidades quedan en `vecino.reservations`
+(área, casa, fecha/hora, estado). Al validar una multa de amenidad, el comité podría ver automáticamente
+"¿esta casa tenía reserva ese día? Sí/No" como contexto anti-disputa. Hoy tiene poco valor (solo ~4 reservas
+totales; el sistema empezó a usarse jun-2026), pero será útil cuando el uso crezca.
 
 ## Resolución oficial de multas + anonimato del reportante (2026-07-02) ✅
 
