@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { callRpc } from "@/lib/rpc";
 
 export type Resolucion = {
@@ -25,6 +25,62 @@ export type Resolucion = {
 
 const money = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
+
+// Renderiza el Markdown acotado que produce la IA (encabezados #, **negritas**,
+// > citas, --- separadores, párrafos) como un documento formal legible.
+function inline(text: string, base: string): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
+    /^\*\*[^*]+\*\*$/.test(p) ? (
+      <strong key={`${base}-${i}`} className="font-semibold text-slate-800">
+        {p.slice(2, -2)}
+      </strong>
+    ) : (
+      <span key={`${base}-${i}`}>{p}</span>
+    )
+  );
+}
+
+function ResolucionMarkdown({ text }: { text: string }) {
+  const lines = text.replace(/\r/g, "").split("\n");
+  const blocks: ReactNode[] = [];
+  let i = 0, k = 0;
+  const esEspecial = (s: string) => /^(#{1,3}\s|>\s?|---|\*\*\*)/.test(s);
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (t === "") { i++; continue; }
+    if (t === "---" || t === "***") { blocks.push(<hr key={k++} className="border-slate-200 my-2" />); i++; continue; }
+    if (/^#{1,3}\s/.test(t)) {
+      const lvl = t.match(/^#+/)![0].length;
+      const cls = lvl === 1 ? "text-base font-bold text-slate-800" : lvl === 2 ? "text-sm font-bold text-slate-800" : "text-sm font-semibold text-slate-700";
+      blocks.push(<p key={k++} className={cls}>{inline(t.replace(/^#+\s/, ""), `h${k}`)}</p>);
+      i++; continue;
+    }
+    if (/^>\s?/.test(t)) {
+      const quote: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i].trim())) { quote.push(lines[i].trim().replace(/^>\s?/, "")); i++; }
+      blocks.push(
+        <blockquote key={k++} className="border-l-4 border-brand-200 pl-3 py-1 text-slate-600 italic text-sm">
+          {inline(quote.join(" "), `q${k}`)}
+        </blockquote>
+      );
+      continue;
+    }
+    const para: string[] = [];
+    while (i < lines.length && lines[i].trim() !== "" && !esEspecial(lines[i].trim())) { para.push(lines[i].trim()); i++; }
+    // Respeta los saltos de línea suaves (líneas tipo "Campo: valor") con <br/>.
+    blocks.push(
+      <p key={k++} className="text-sm text-slate-700 leading-relaxed">
+        {para.map((ln, j) => (
+          <span key={`l${j}`}>
+            {j > 0 && <br />}
+            {inline(ln, `p${k}-${j}`)}
+          </span>
+        ))}
+      </p>
+    );
+  }
+  return <div className="flex flex-col gap-2">{blocks}</div>;
+}
 const fechaHora = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleString("es-MX", {
@@ -151,9 +207,9 @@ function ResolucionModal({ r, onClose }: { r: Resolucion; onClose: () => void })
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
                 Resolución del Comité
               </p>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-white ring-1 ring-slate-100 rounded-2xl p-4">
-                {r.resolucion_oficial}
-              </p>
+              <div className="bg-white ring-1 ring-slate-100 rounded-2xl p-4">
+                <ResolucionMarkdown text={r.resolucion_oficial} />
+              </div>
             </div>
           ) : (
             <p className="text-xs text-slate-400">
