@@ -7,6 +7,30 @@
 > 🔎 **RETOMAR AQUÍ:** ver `REVISION_PENDIENTE.md` — paridad para lanzamiento (deploy ≠ cutover).
 > El review E2E del 2026-06-27 (abajo) verificó BD + 13 rutas contra producción: **~82% al lanzamiento**.
 
+## Auto-conciliar: respaldo por monto+fecha con aprobación del comité (2026-07-02) ✅
+
+Antes, la conciliación cruzaba el comprobante del vecino contra el banco **solo por clave de
+rastreo SPEI** (`conciliar_auto`, 028). Si el OCR no leía la clave o el banco no la traía en el
+concepto, el comprobante se ignoraba aunque monto y fecha cuadraran. **Nuevo respaldo (migración 036):**
+- **`sugerir_abono(monto, fecha, banco_hash, dias=3)`** — READ-ONLY. Para una fila del banco sin match
+  por rastreo, busca abonos `pendiente` **con `comprobante_url`** de la colonia con **monto exacto** y
+  fecha (OCR `comprobante_ocr->>'fecha'`, o `created_at` en hora MX como fallback) dentro de **±3 días**
+  (ventana confirmada por Juan). Devuelve candidatos {abono_id, casa, comprobante_url, fecha_ocr} + dedup
+  por `banco_hash`. **No muta nada.**
+- **`conciliar_confirmar(abono_id, banco_hash, fecha)`** — liga la fila del banco a ESE abono del vecino
+  y lo aprueba (reusa `resolver_transaccion`, `FOR UPDATE`, dedup por `banco_hash`). Igual que el match
+  único de 028 pero disparado por el clic del comité, no automático.
+- **UI** (`dashboard/conciliacion/page.tsx`): `autoConciliar()` gana un **PASO 3** — lo que no casa por
+  rastreo ni por concepto pasa a estado **`propuesta`** (fila ámbar) con **miniatura del comprobante** del
+  vecino + casa sugerida + **[Aprobar]/[Descartar]**; si hay varios candidatos (mismo monto+día) muestra
+  un `<select>` para elegir la casa. **Nada por monto+fecha se aplica sin el clic del comité.** Las filas
+  `propuesta` quedan fuera de "Conciliar seleccionados" (no se duplican). Resumen ahora reporta
+  "propuestas por monto+fecha: N".
+
+Flujo recomendado al comité: **Auto-conciliar primero** (limpia rastreo + propone monto+fecha) → aprobar
+propuestas → luego "Conciliar seleccionados" para lo que quedó a mano. Evita crear abonos duplicados sobre
+comprobantes que el vecino ya subió. Build + tsc + eslint en verde.
+
 ## Recibo foliado de abonos (paridad Django) + backfill resoluciones (2026-07-02) ✅
 
 **Recibo de abonos:** el Django viejo generaba, al aprobar un abono, un **recibo PDF foliado**

@@ -6,6 +6,14 @@ import { useCallback, useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
+// Candidato de match por monto+fecha contra un comprobante que subió el vecino.
+type Propuesta = {
+  abonoId: string;
+  casa: string;
+  comprobanteUrl: string | null;
+  fechaOcr: string | null;
+};
+
 type Ingreso = {
   key: string; // id local
   fecha: string;
@@ -18,8 +26,12 @@ type Ingreso = {
   conf: "alta" | "media" | null; // confianza de la casa extraída del concepto
   incluir: boolean;
   dup: boolean;
-  estado: "" | "ok" | "dup" | "error";
+  estado: "" | "ok" | "dup" | "error" | "propuesta";
   errorMsg?: string;
+  // Propuestas por monto+fecha (comprobantes de vecinos que cuadran). El comité
+  // aprueba una antes de aplicarla — nada se concilia solo por esta vía.
+  propuestas?: Propuesta[];
+  propuestaSel?: string; // abonoId elegido cuando hay varios candidatos
 };
 
 const money = (n: number) =>
@@ -239,12 +251,14 @@ export default function ConciliacionPage() {
     setAutoResumen(null);
     let auto = 0,
       porComprobante = 0,
+      propuestos = 0,
       pendientes = 0,
       dup = 0;
     const updated = [...ingresos];
     for (let i = 0; i < updated.length; i++) {
       const row = updated[i];
-      if (!row.incluir || row.estado === "ok" || row.estado === "dup") continue;
+      if (!row.incluir || row.estado === "ok" || row.estado === "dup" || row.estado === "propuesta")
+        continue;
 
       // 1) match por comprobante que subió el vecino (clave de rastreo). Aprueba SU abono.
       const { data, error } = await supabaseBrowser.rpc("conciliar_auto", {
@@ -282,16 +296,93 @@ export default function ConciliacionPage() {
           continue;
         }
       }
-      // 3) casa media/dudosa → queda pre-llenada para que el comité confirme
+
+      // 3) respaldo por MONTO + FECHA: busca comprobantes de vecinos que cuadren.
+      //    NO se aplica solo — queda como propuesta para que el comité apruebe.
+      const { data: dSug } = await supabaseBrowser.rpc("sugerir_abono", {
+        p_monto: row.monto,
+        p_fecha: row.fecha || null,
+        p_banco_hash: row.hash,
+      });
+      const sug = dSug as {
+        dup?: boolean;
+        candidatos?: {
+          abono_id: string;
+          casa: string;
+          comprobante_url: string | null;
+          fecha_ocr: string | null;
+        }[];
+      } | null;
+      if (sug?.dup) {
+        dup++;
+        updated[i] = { ...row, estado: "dup", incluir: false };
+        continue;
+      }
+      const cands = sug?.candidatos ?? [];
+      if (cands.length > 0) {
+        propuestos++;
+        const propuestas: Propuesta[] = cands.map((c) => ({
+          abonoId: c.abono_id,
+          casa: c.casa,
+          comprobanteUrl: c.comprobante_url,
+          fechaOcr: c.fecha_ocr,
+        }));
+        updated[i] = {
+          ...row,
+          estado: "propuesta",
+          incluir: false,
+          propuestas,
+          propuestaSel: propuestas[0].abonoId,
+          casa: propuestas[0].casa,
+        };
+        continue;
+      }
+
+      // 4) casa media/dudosa → queda pre-llenada para que el comité confirme
       pendientes++;
     }
     setIngresos(updated);
     setAutoBusy(false);
     setAutoResumen(
       `Auto-conciliados: ${auto + porComprobante} (${porComprobante} por comprobante, ${auto} por concepto) · ` +
-        `por confirmar a mano: ${pendientes} · ya importados: ${dup}.`
+        `propuestas por monto+fecha: ${propuestos} · por confirmar a mano: ${pendientes} · ya importados: ${dup}.`
     );
     await cargarMapas();
+  }
+
+  // Aprueba una propuesta monto+fecha: liga la fila del banco al abono del vecino.
+  async function aprobarPropuesta(key: string) {
+    const row = ingresos.find((r) => r.key === key);
+    if (!row || row.estado !== "propuesta") return;
+    const abonoId = row.propuestaSel ?? row.propuestas?.[0]?.abonoId;
+    if (!abonoId) return;
+    setRow(key, { errorMsg: undefined });
+    const { data, error } = await supabaseBrowser.rpc("conciliar_confirmar", {
+      p_abono_id: abonoId,
+      p_banco_hash: row.hash,
+      p_fecha: row.fecha || null,
+    });
+    if (error) {
+      setRow(key, { estado: "error", errorMsg: error.message.replace(/^.*?:\s/, "") });
+      return;
+    }
+    const r = data as { ok?: boolean; dup?: boolean; casa?: string } | null;
+    if (r?.dup) {
+      setRow(key, { estado: "dup", incluir: false, propuestas: undefined });
+    } else {
+      setRow(key, {
+        estado: "ok",
+        incluir: false,
+        casa: r?.casa ?? row.casa,
+        propuestas: undefined,
+      });
+    }
+    await cargarMapas();
+  }
+
+  // Descarta las propuestas → la fila vuelve a "asignar a mano".
+  function descartarPropuesta(key: string) {
+    setRow(key, { estado: "", incluir: true, propuestas: undefined, propuestaSel: undefined });
   }
 
   async function conciliar() {
@@ -442,6 +533,8 @@ export default function ConciliacionPage() {
                         ? "bg-slate-50 ring-slate-200 opacity-70"
                         : r.estado === "error"
                         ? "bg-red-50 ring-red-200"
+                        : r.estado === "propuesta"
+                        ? "bg-amber-50 ring-amber-200"
                         : "bg-white ring-slate-100"
                     }`}
                   >
@@ -466,13 +559,18 @@ export default function ConciliacionPage() {
                           <input
                             value={r.casa}
                             onChange={(e) => setRow(r.key, { casa: e.target.value })}
-                            disabled={r.estado === "ok" || r.estado === "dup"}
+                            disabled={r.estado === "ok" || r.estado === "dup" || r.estado === "propuesta"}
                             placeholder="N°"
                             className="w-20 rounded-lg ring-1 ring-slate-200 px-2 py-1 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-300"
                           />
                           {r.sugerida && r.estado === "" && (
                             <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 rounded-full px-2 py-0.5">
                               sugerida
+                            </span>
+                          )}
+                          {r.estado === "propuesta" && (
+                            <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+                              propuesta · monto+fecha
                             </span>
                           )}
                           {r.estado === "ok" && (
@@ -485,6 +583,68 @@ export default function ConciliacionPage() {
                             <span className="text-[10px] font-semibold text-red-600">{r.errorMsg}</span>
                           )}
                         </div>
+
+                        {/* Propuesta por monto+fecha: comprobante del vecino que cuadra */}
+                        {r.estado === "propuesta" && r.propuestas && (
+                          <div className="mt-2 rounded-xl bg-white ring-1 ring-amber-200 p-2">
+                            <p className="text-[11px] text-amber-800 font-semibold">
+                              Coincide con {r.propuestas.length === 1 ? "un comprobante" : `${r.propuestas.length} comprobantes`} de vecino
+                            </p>
+                            {r.propuestas.length > 1 && (
+                              <select
+                                value={r.propuestaSel}
+                                onChange={(e) => setRow(r.key, { propuestaSel: e.target.value, casa: r.propuestas!.find((p) => p.abonoId === e.target.value)?.casa ?? r.casa })}
+                                className="mt-1 w-full rounded-lg ring-1 ring-amber-200 px-2 py-1 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-amber-300"
+                              >
+                                {r.propuestas.map((p) => (
+                                  <option key={p.abonoId} value={p.abonoId}>
+                                    Casa {p.casa}{p.fechaOcr ? ` · ${p.fechaOcr}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {(() => {
+                              const sel = r.propuestas!.find((p) => p.abonoId === r.propuestaSel) ?? r.propuestas![0];
+                              return (
+                                <div className="mt-2 flex items-center gap-2">
+                                  {sel.comprobanteUrl ? (
+                                    <a href={sel.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                                      {/* comprobante del vecino — Storage remoto, sin config next/image */}
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={sel.comprobanteUrl}
+                                        alt="Comprobante"
+                                        className="w-12 h-12 rounded-lg object-cover ring-1 ring-amber-200"
+                                      />
+                                    </a>
+                                  ) : (
+                                    <span className="w-12 h-12 rounded-lg bg-amber-100 grid place-items-center text-amber-500 text-lg shrink-0">🧾</span>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs text-slate-600">
+                                      Casa <span className="font-bold">{sel.casa}</span>
+                                      {sel.fechaOcr ? ` · comprobante ${sel.fechaOcr}` : ""}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                onClick={() => aprobarPropuesta(r.key)}
+                                className="rounded-lg bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90"
+                              >
+                                Aprobar
+                              </button>
+                              <button
+                                onClick={() => descartarPropuesta(r.key)}
+                                className="rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 hover:bg-slate-200"
+                              >
+                                Descartar
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </li>
