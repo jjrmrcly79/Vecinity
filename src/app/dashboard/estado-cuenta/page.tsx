@@ -6,6 +6,9 @@ import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { callRpc } from "@/lib/rpc";
 import { generarReciboAbono } from "../recibo-actions";
+import { VerResolucionButton } from "../_components/VerResolucionButton";
+
+const esMulta = (concepto: string) => /^multa\b/i.test(concepto);
 
 type Mov = {
   id: string;
@@ -319,6 +322,12 @@ export default function EstadoCuentaPage() {
                               >
                                 {m.recibo_pdf_url ? "🧾 Recibo" : "🧾 Generar recibo"}
                               </button>
+                            )}
+                            {m.tipo === "cargo" && esMulta(m.concepto) && (
+                              <VerResolucionButton
+                                transactionId={m.id}
+                                className="text-xs text-brand-600 font-semibold underline"
+                              />
                             )}
                           </div>
                           {esAbono && m.estado === "pendiente" && (
