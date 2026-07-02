@@ -13,8 +13,12 @@ type Profile = {
   colonia_id: string | null;
   house_id: string | null;
   approval_status: string;
+  telegram_chat_id: string | null;
   colonia?: { nombre: string } | null;
 };
+
+// Bot de Telegram (Caty). Deep-link de vinculación: t.me/<bot>?start=vecino_<profileId>
+const TELEGRAM_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT;
 type House = { numero: string; street: string | null; saldo: number };
 type Pending = { id: string; nombre: string; email: string; created_at: string };
 
@@ -48,6 +52,7 @@ export default function Dashboard() {
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdStart = useRef(0);
   const [ready, setReady] = useState(false);
+  const [tgChecking, setTgChecking] = useState(false);
   const [resolviendo, setResolviendo] = useState<Set<string>>(new Set());
   const [pendErr, setPendErr] = useState<string | null>(null);
   const [noLeidos, setNoLeidos] = useState(0);
@@ -73,7 +78,7 @@ export default function Dashboard() {
       const { data: prof } = await supabaseBrowser
         .from("profiles")
         .select(
-          "id, nombre, role, colonia_id, house_id, approval_status, colonia:colonias(nombre)"
+          "id, nombre, role, colonia_id, house_id, approval_status, telegram_chat_id, colonia:colonias(nombre)"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -131,6 +136,25 @@ export default function Dashboard() {
     setSosState("sent");
     setTimeout(() => setSosState("idle"), 6000);
   }, [profile]);
+
+  // Abre Caty en Telegram con el deep-link de vinculación (n8n liga el chat).
+  function conectarCaty() {
+    if (!profile || !TELEGRAM_BOT) return;
+    window.open(`https://t.me/${TELEGRAM_BOT}?start=vecino_${profile.id}`, "_blank", "noopener");
+  }
+  // Re-consulta si ya quedó vinculado (n8n escribe telegram_chat_id de forma asíncrona).
+  async function verificarCaty() {
+    if (!profile) return;
+    setTgChecking(true);
+    const { data } = await supabaseBrowser
+      .from("profiles")
+      .select("telegram_chat_id")
+      .eq("id", profile.id)
+      .maybeSingle();
+    const chat = (data as { telegram_chat_id: string | null } | null)?.telegram_chat_id ?? null;
+    setProfile((p) => (p ? { ...p, telegram_chat_id: chat } : p));
+    setTgChecking(false);
+  }
 
   function clearHold() {
     if (holdTimer.current) {
@@ -247,6 +271,36 @@ export default function Dashboard() {
               <span className="text-white/90">Ver detalle ›</span>
             </p>
           </button>
+        )}
+
+        {/* Conectar Caty (Telegram) — solo si el residente aún no está vinculado */}
+        {profile && !profile.telegram_chat_id && TELEGRAM_BOT && (
+          <div className="mt-5 w-full rounded-3xl bg-white ring-1 ring-sky-200 p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">💬</span>
+              <div className="min-w-0">
+                <p className="font-bold text-slate-800">Conecta con Caty en Telegram</p>
+                <p className="text-xs text-slate-500">
+                  Recibe avisos del comité, tu estado de cuenta y alertas directo en tu celular.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={conectarCaty}
+                className="flex-1 rounded-xl bg-sky-500 text-white font-semibold text-sm px-4 py-2.5 hover:bg-sky-600 transition"
+              >
+                Conectar con Caty
+              </button>
+              <button
+                onClick={verificarCaty}
+                disabled={tgChecking}
+                className="rounded-xl ring-1 ring-slate-200 text-slate-600 font-semibold text-sm px-4 py-2.5 hover:bg-slate-50 disabled:opacity-40"
+              >
+                {tgChecking ? "…" : "Ya lo hice"}
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Comunicados */}
